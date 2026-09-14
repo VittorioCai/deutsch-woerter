@@ -15,3 +15,4 @@
 .speakBtn{margin-left:0}
 .homeSpellRow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-4px 2px 14px}
 .homeSpellRow .small{color:var(--accent);font-weight:700}
+.small a{color:var(--accent)}

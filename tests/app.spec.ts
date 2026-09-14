@@ -424,6 +424,7 @@ test('dictation asks by ear and does not leak the word', async ({ page }) => {
 });
 
 test('the revealed answer can be played back in every mode', async ({ page }) => {
+  await page.route('**upload.wikimedia.org/**', (route) => route.fulfill({ status: 404, body: 'no' }));
   await page.addInitScript(() => {
     (window as any).__spoken = [];
     Object.defineProperty(window, 'speechSynthesis', {
@@ -446,7 +447,8 @@ test('the revealed answer can be played back in every mode', async ({ page }) =>
   const quizSpeak = page.locator('#feedback .speakBtn');
   await expect(quizSpeak).toHaveCount(1);
   await quizSpeak.click();
-  expect((await page.evaluate(() => (window as any).__spoken as string[])).length).toBe(1);
+  // speech is asynchronous now: a recording is tried before synthesis
+  await expect.poll(() => page.evaluate(() => ((window as any).__spoken as string[]).length)).toBe(1);
 
   // learning mode: same button on the revealed answer
   await page.locator('#modeBack').click();
@@ -643,6 +645,7 @@ test('the two spelling toggles stay in sync', async ({ page }) => {
 });
 
 test('speech picks the best German voice the device has', async ({ page }) => {
+  await page.route('**upload.wikimedia.org/**', (route) => route.fulfill({ status: 404, body: 'no' }));
   // A realistic Apple + Google mix: the default the browser would have chosen is
   // the compact one, which is exactly what made pronunciation sound robotic.
   await page.addInitScript(() => {
@@ -678,6 +681,7 @@ test('speech picks the best German voice the device has', async ({ page }) => {
   expect(options[0]).toContain('★');
 
   await page.locator('#voiceTest').click();
+  await expect.poll(() => page.evaluate(() => (window as any).__spoken.length)).toBe(1);
   const first = await page.evaluate(() => (window as any).__spoken[0]);
   expect(first.voice).toBe('anna-premium');
   expect(first.rate).toBe(0.85);
@@ -690,6 +694,7 @@ test('speech picks the best German voice the device has', async ({ page }) => {
   await ready(page);
   await page.locator('#goLearn').click();
   await page.locator('#voiceTest').click();
+  await expect.poll(() => page.evaluate(() => (window as any).__spoken.length)).toBeGreaterThan(0);
   const after = await page.evaluate(() => {
     const s = (window as any).__spoken as Array<{ voice: string; rate: number }>;
     return s[s.length - 1];
@@ -778,4 +783,100 @@ test('Android is told to install the German voice data, not just switch browser'
   // a voice that says nothing about its quality must not be called basic, nor starred
   await expect(hint).not.toContainText('基础音质');
   expect(await page.locator('#voicePick option').allTextContents()).toEqual(['Deutsch (Deutschland)']);
+});
+
+// Commons is not reachable from CI, so it is simulated: the point of these tests
+// is the fetch/cache/fallback logic, and the URL shape is pinned separately in
+// tests/data.test.ts against paths read off the real service.
+const stubAudio = async (page: Page, opts: { status?: number } = {}) => {
+  await page.addInitScript(() => {
+    (window as any).__played = [];
+    (window as any).__spoken = [];
+    (window as any).Audio = class {
+      src: string;
+      onended: (() => void) | null = null;
+      constructor(src: string) { this.src = src; (window as any).__played.push(src) }
+      play() { return Promise.resolve() }
+      pause() {}
+    };
+    Object.defineProperty(window, 'speechSynthesis', {
+      configurable: true,
+      value: {
+        cancel() {}, addEventListener() {},
+        getVoices: () => [{ name: 'Anna (Premium)', lang: 'de-DE', voiceURI: 'anna', localService: true }],
+        speak: (u: { text: string }) => (window as any).__spoken.push(u.text),
+      },
+    });
+    (window as any).SpeechSynthesisUtterance = class { text: string; lang = ''; rate = 1; voice: unknown = null; constructor(t: string) { this.text = t } };
+  });
+  const seen: string[] = [];
+  await page.route('**upload.wikimedia.org/**', async (route) => {
+    seen.push(route.request().url());
+    if (opts.status && opts.status !== 200) return route.fulfill({ status: opts.status, body: 'no' });
+    await route.fulfill({ status: 200, contentType: 'audio/mpeg', body: Buffer.from([0xff, 0xfb, 0x90, 0x00]) });
+  });
+  return seen;
+};
+
+test('plays the recorded pronunciation and caches it', async ({ page }) => {
+  const requests = await stubAudio(page);
+  await page.goto(APP);
+  await ready(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#voiceTest').click();   // speaks "Haus"
+
+  await expect.poll(() => requests.length).toBe(1);
+  // the exact path verified against the live service
+  expect(requests[0]).toBe(
+    'https://upload.wikimedia.org/wikipedia/commons/transcoded/7/7e/De-Haus.ogg/De-Haus.ogg.mp3',
+  );
+  expect(await page.evaluate(() => (window as any).__played.length)).toBe(1);
+  expect(await page.evaluate(() => (window as any).__spoken)).toEqual([]); // no synthesis
+
+  // second play comes from the cache, not the network
+  await page.locator('#voiceTest').click();
+  await expect.poll(() => page.evaluate(() => (window as any).__played.length)).toBe(2);
+  expect(requests.length).toBe(1);
+});
+
+test('falls back to synthesis when a word has no recording, and stops retrying it', async ({ page }) => {
+  const requests = await stubAudio(page, { status: 404 });
+  await page.goto(APP);
+  await ready(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#voiceTest').click();
+
+  await expect.poll(() => page.evaluate(() => (window as any).__spoken)).toEqual(['Haus']);
+  expect(await page.evaluate(() => (window as any).__played)).toEqual([]);
+  expect(requests.length).toBe(1);
+
+  // a known miss is remembered, so the same word is not fetched again
+  await page.locator('#voiceTest').click();
+  await expect.poll(() => page.evaluate(() => (window as any).__spoken.length)).toBe(2);
+  expect(requests.length).toBe(1);
+});
+
+test('recorded audio can be turned off', async ({ page }) => {
+  const requests = await stubAudio(page);
+  await page.goto(APP);
+  await ready(page);
+  await page.locator('#goLearn').click();
+  await expect(page.locator('#recordedToggle')).toBeChecked();
+  await expect(page.locator('#recordedNote')).toContainText('Wikimedia Commons');
+
+  await page.locator('#recordedToggle').uncheck();
+  await expect(page.locator('#recordedNote')).toContainText('只用设备语音合成');
+  await page.locator('#voiceTest').click();
+  await expect.poll(() => page.evaluate(() => (window as any).__spoken)).toEqual(['Haus']);
+  expect(requests).toEqual([]);
+});
+
+test('a network failure still produces sound', async ({ page }) => {
+  await stubAudio(page);
+  await page.route('**upload.wikimedia.org/**', (route) => route.abort('failed'));
+  await page.goto(APP);
+  await ready(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#voiceTest').click();
+  await expect.poll(() => page.evaluate(() => (window as any).__spoken)).toEqual(['Haus']);
 });

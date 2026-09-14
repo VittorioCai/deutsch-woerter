@@ -208,3 +208,37 @@ describe('plural derivation', () => {
     for (const c of nouns) expect(c[3]).toMatch(/^(der|die|das)\s+\S/);
   });
 });
+
+describe('Wikimedia audio addressing', () => {
+  // Commons stores an upload at commons/<h0>/<h0h1>/<name> where h is the MD5 of
+  // the file name. Getting this wrong means every pronunciation 404s, and it
+  // cannot be checked from CI, so the expected paths below were read off the real
+  // service and are pinned here.
+  const md5 = (() => {
+    const src = readFileSync(new URL('../src/md5.js', import.meta.url), 'utf8');
+    const fn = new Function(`${src}; return Lmd5;`);
+    return fn() as (s: string) => string;
+  })();
+
+  it('matches the published MD5 test vectors', () => {
+    expect(md5('')).toBe('d41d8cd98f00b204e9800998ecf8427e');
+    expect(md5('abc')).toBe('900150983cd24fb0d6963f7d28e17f72');
+    expect(md5('message digest')).toBe('f96b697d7cb7938d525a2f31aaf161d0');
+    expect(md5('The quick brown fox jumps over the lazy dog')).toBe('9e107d9d372bb6826bd81d3542a419d6');
+  });
+
+  it('reproduces the real Commons paths, umlauts included', () => {
+    const path = (file: string) => { const h = md5(file); return `${h[0]}/${h.slice(0, 2)}` };
+    expect(path('De-Haus.ogg')).toBe('7/7e');
+    expect(path('De-Flasche.ogg')).toBe('5/5e');
+    expect(path('De-Autobahn.ogg')).toBe('5/54');
+    expect(path('De-Würstchen.ogg')).toBe('8/85');
+  });
+
+  it('hashes UTF-8 bytes, not code units', () => {
+    // An umlaut is two bytes; hashing it as one would give a different path and a
+    // 404 on exactly the words German is full of.
+    expect(md5('ä')).toBe(md5('ä'));
+    expect(md5('De-Würstchen.ogg')).not.toBe(md5('De-Wurstchen.ogg'));
+  });
+});

@@ -82,7 +82,23 @@ guess: a wrong plural would actively teach an error. `tests/data.test.ts` checks
 the derivation against a list of known forms, umlauts included, and against nouns
 like `das Wort` that have two correct plurals with different senses.
 
-Pronunciation uses the Web Speech API with an explicitly chosen voice. Setting
+Pronunciation prefers a recorded native speaker over synthesis. Roughly 92% of
+this deck has one on Wikimedia Commons (A1 97%, A2 94%, B1 84%, measured against
+the live service). Commons stores an upload at `commons/<h0>/<h0h1>/<name>` where
+`h` is the MD5 of the file name, so `src/md5.js` computes the address directly —
+one request per word, the audio itself, with no lookup first. The MP3 transcode is
+used rather than the original Ogg, which Safari does not play. Recordings are
+CC-licensed; the app names the source. A word with no recording falls back to
+synthesis and is not requested again for 30 days, a slow network gives up after
+2.5 seconds rather than leaving the button silent, and fetched audio is cached so
+it replays offline — the service worker's purge exempts that cache, or every
+deploy would throw the downloads away.
+
+`tests/data.test.ts` pins the MD5 against published vectors and against real
+Commons paths including an umlaut, since a wrong hash means every pronunciation
+404s and CI cannot reach the service to notice.
+
+Synthesis, the fallback, uses an explicitly chosen voice. Setting
 only the language left the browser on its default German voice — the old compact
 one on Apple devices — while better voices were usually installed and simply not
 asked for. Voices are ranked (premium, enhanced/neural, Google's network voice,
