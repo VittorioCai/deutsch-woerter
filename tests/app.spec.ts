@@ -281,3 +281,105 @@ test('batches writes instead of re-serialising the whole store per answer', asyn
   expect(result.during).toBe(0);
   expect(result.total).toBeGreaterThanOrEqual(1);
 });
+
+test('today card clears due words across chapters in one session', async ({ page }) => {
+  await page.goto(APP);
+  await ready(page);
+  // Due words spread over three different Kapitel. Review used to be locked to
+  // whichever chapter the picker showed, so this needed three separate sessions.
+  const cards = await deck(page);
+  const pick = ['1', '2', '3'].map((ch) => cards.filter((c) => c.level === 'A1' && String(c.chapter) === ch).slice(0, 4));
+  const ids = pick.flat().map((c) => c.id);
+  await page.evaluate(([learnKey, schemaKey, ids]) => {
+    const learn: Record<string, unknown> = {};
+    for (const id of ids as string[]) {
+      learn[id] = { introduced: true, strength: 3, wrong: 0, hard: 0, last: 1, due: 1, spellingPass: false, cycles: 1, known: false };
+    }
+    localStorage.setItem(learnKey as string, JSON.stringify(learn));
+    localStorage.setItem(schemaKey as string, '2');
+  }, [LEARN_KEY, SCHEMA_KEY, ids] as const);
+  await page.reload();
+  await ready(page);
+
+  await expect(page.locator('#todayCount')).toHaveText(/\d+/);
+  await expect(page.locator('#todayBreak')).toContainText('12 个到期复习');
+  await page.locator('#goToday').click();
+  await expect(page.locator('#learnCard')).toBeVisible();
+  await expect(page.locator('#learnBadge')).toContainText('1/');
+
+  // The queue length is the proof that it spans chapters: each due word costs
+  // three stages, so 12 due words across three Kapitel means at least 36 items.
+  // Chapter-locked review would have found only the 4 words in one Kapitel.
+  const total = Number((await page.locator('#learnBadge').textContent())!.match(/\/(\d+)/)![1]);
+  expect(total).toBeGreaterThanOrEqual(36);
+});
+
+test('gender drill asks for der/die/das and scores per article', async ({ page }) => {
+  await page.goto(APP);
+  await ready(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#learnDrillBtn').click();
+  await expect(page.locator('#drillOverlay')).toBeVisible();
+  await expect(page.locator('#drillContent')).toContainText('性别专项');
+  await page.locator('#drillStart').click();
+
+  const buttons = page.locator('#drillContent .genderGrid button');
+  await expect(buttons).toHaveCount(3);
+  await expect(buttons.nth(0)).toHaveText('der');
+  // the prompt must hide the article, or the question answers itself
+  await expect(page.locator('.drillWord')).not.toContainText(/^(der|die|das)\s/);
+  await buttons.nth(0).click();
+  await expect(page.locator('#drillContent .genderGrid button.correct')).toHaveCount(1);
+  await expect(page.locator('#drillNext')).toBeVisible();
+  await page.locator('#drillNext').click();
+  await expect(page.locator('.drillWord')).toBeVisible();
+
+  await page.locator('#drillClose').click();
+  await page.locator('#learnDrillBtn').click();
+  await expect(page.locator('#drillContent')).toContainText('%'); // per-article accuracy recorded
+});
+
+test('plural drill accepts every attested plural of the same noun', async ({ page }) => {
+  await page.goto(APP);
+  await ready(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#learnDrillBtn').click();
+  await page.locator('#tabPlural').click();
+  await expect(page.locator('#drillContent')).toContainText('复数专项');
+  await page.locator('#drillStart').click();
+  await expect(page.locator('#drillAnswer')).toBeVisible();
+  // the German character bar must be reachable from the plural input
+  await expect(page.locator('.charBar[data-target="drillAnswer"] .charKey')).toHaveCount(7);
+  await page.locator('.charBar[data-target="drillAnswer"] .charKey', { hasText: 'ä' }).first().click();
+  await expect(page.locator('#drillAnswer')).toHaveValue('ä');
+  await page.locator('#drillShow').click();
+  await expect(page.locator('#drillFeedback')).toContainText('正确答案');
+  await expect(page.locator('#drillFeedback .deAnswer')).toContainText('die ');
+});
+
+test('wrong-book explains what kind of mistake was made', async ({ page }) => {
+  await page.goto(APP);
+  await ready(page);
+  const cards = await deck(page);
+  const noun = cards.find((c) => /^die\s/.test(c.de))!;
+  await page.evaluate(([wrongKey, schemaKey, noun]) => {
+    const n = noun as { id: string; level: string; chapter: string; de: string };
+    const stem = n.de.replace(/^die\s+/, '');
+    localStorage.setItem(wrongKey as string, JSON.stringify({
+      u: { id: 'u', level: 'A1', chapter: '1', de: 'die Bücher', zh: '书', en: 'books', wrongCount: 1, lastAt: 3, lastInput: 'die Bucher' },
+      a: { id: 'a', level: 'A1', chapter: '1', de: n.de, zh: '', en: 'x', wrongCount: 1, lastAt: 2, lastInput: `der ${stem}` },
+      t: { id: 't', level: 'A1', chapter: '1', de: 'die Flasche', zh: '瓶子', en: 'bottle', wrongCount: 1, lastAt: 1, lastInput: 'die Flashe' },
+    }));
+    localStorage.setItem(schemaKey as string, '2');
+  }, [WRONG_KEY, SCHEMA_KEY, noun] as const);
+  await page.reload();
+  await ready(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#learnWrongBtn').click();
+  await expect(page.locator('#wrongOverlay')).toBeVisible();
+  const summary = page.locator('.causeBox');
+  await expect(summary).toContainText('错因分析');
+  await expect(summary).toContainText('变音漏写或写错');
+  await expect(summary).toContainText('冠词错');
+  await expect(summary).toContainText('拼写接近');
+});

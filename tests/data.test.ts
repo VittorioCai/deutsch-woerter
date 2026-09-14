@@ -112,3 +112,99 @@ describe('vocabulary build outputs', () => {
     expect(hash()).toBe(before);
   });
 });
+
+describe('plural derivation', () => {
+  build();
+  const cards: Card[] = readJson('cards.json');
+
+  // Mirrors LpluralOf / LumlautStem in src/drills-addon.js. The Glossar writes
+  // plurals compactly — a leading " or * marks an umlaut — so the drill derives
+  // the full form. A wrong derivation would actively teach the learner an error,
+  // which is worse than having no drill, hence the ground-truth list below.
+  const stemOf = (de: string) => de.replace(/^(der|die|das)\s+/i, '').trim();
+  const umlautStem = (stem: string) => {
+    const m = /(au|[aou])(?![\s\S]*(?:au|[aou]))/i.exec(stem);
+    if (!m) return null;
+    const map: Record<string, string> = { a: 'ä', o: 'ö', u: 'ü', au: 'äu', A: 'Ä', O: 'Ö', U: 'Ü', Au: 'Äu', AU: 'ÄU' };
+    const hit = m[1];
+    const rep = map[hit] ?? map[hit.toLowerCase()];
+    return rep ? stem.slice(0, m.index) + rep + stem.slice(m.index + hit.length) : null;
+  };
+  const pluralOf = (de: string, grammar: string) => {
+    const raw = (grammar || '').trim();
+    if (!raw) return null;
+    const explicit = raw.match(/^Plural:\s*(?:die\s+)?(.+)$/i);
+    if (explicit) {
+      const form = explicit[1].trim();
+      return /^[A-Za-zÄÖÜäöüß][\wÄÖÜäöüß-]*$/.test(form) ? `die ${form}` : null;
+    }
+    const short = raw.match(/^(["*]*)-?(n|en|nen|e|er|s|se|ien|es|€)?$/);
+    if (!short) return null;
+    const suffix = (short[2] || '').replace(/€/g, 'e');
+    let stem = stemOf(de);
+    if (!stem || /[\s|/]/.test(stem)) return null;
+    if (short[1]) {
+      const u = umlautStem(stem);
+      if (!u) return null;
+      stem = u;
+    }
+    return `die ${stem}${suffix}`;
+  };
+
+  const groundTruth: Record<string, string> = {
+    Vater: 'die Väter', Apfel: 'die Äpfel', Mutter: 'die Mütter', Stadt: 'die Städte',
+    Hand: 'die Hände', Nacht: 'die Nächte', Sohn: 'die Söhne', Zug: 'die Züge',
+    Arzt: 'die Ärzte', Garten: 'die Gärten', Laden: 'die Läden', Mantel: 'die Mäntel',
+    Vogel: 'die Vögel', Haus: 'die Häuser', Land: 'die Länder', Mann: 'die Männer',
+    Buch: 'die Bücher', Fluss: 'die Flüsse', Stuhl: 'die Stühle',
+    Rock: 'die Röcke', Ball: 'die Bälle', Maus: 'die Mäuse', Turm: 'die Türme',
+    Hals: 'die Hälse', Kind: 'die Kinder', Ei: 'die Eier', Bild: 'die Bilder',
+    Kindergarten: 'die Kindergärten', Handtuch: 'die Handtücher', Tag: 'die Tage', Wort: 'die Wörter',
+    Beruf: 'die Berufe', Flasche: 'die Flaschen', Koffer: 'die Koffer', Auto: 'die Autos',
+    Freundin: 'die Freundinnen', Rucksack: 'die Rucksäcke', Einkauf: 'die Einkäufe',
+    Hauptsatz: 'die Hauptsätze', Schwimmbad: 'die Schwimmbäder', Wand: 'die Wände',
+  };
+
+  // A few nouns have two correct plurals with different senses, recorded on
+  // separate cards: das Wort is die Wörter (separate words) and die Worte
+  // (connected speech).
+  const multiPlural: Record<string, string[]> = { Wort: ['die Wörter', 'die Worte'] };
+
+  it('derives known German plurals correctly, umlauts included', () => {
+    const wrong: string[] = [];
+    for (const [word, expected] of Object.entries(groundTruth)) {
+      // A word can appear more than once; only entries that carry plural data
+      // produce a question, so check those.
+      const withData = cards.filter((c) => stemOf(c[3]) === word && /^(der|die|das)\s/i.test(c[3]) && c[5]?.trim());
+      expect(withData.length, `${word} has no plural data in the deck`).toBeGreaterThan(0);
+      for (const c of withData) {
+        const got = pluralOf(c[3], c[5]);
+        const allowed = multiPlural[word] ?? [expected];
+        if (!got || !allowed.includes(got)) wrong.push(`${word}: got ${got}, expected one of ${allowed.join(' / ')}`);
+      }
+    }
+    expect(wrong).toEqual([]);
+  });
+
+  it('returns nothing rather than guessing when the data is absent or ambiguous', () => {
+    // "der Platz" meaning "room" carries no plural marker — it must be skipped,
+    // not guessed at.
+    const bare = cards.find((c) => c[3] === 'der Platz' && !c[5]?.trim());
+    expect(bare).toBeDefined();
+    expect(pluralOf(bare![3], bare![5])).toBeNull();
+    expect(pluralOf('die Pizza', '-s/Pizzen')).toBeNull();
+    expect(pluralOf('das Ding', '5')).toBeNull();
+  });
+
+  it('covers a worthwhile share of the nouns', () => {
+    const nouns = cards.filter((c) => /^(der|die|das)\s/i.test(c[3]));
+    const drillable = nouns.filter((c) => pluralOf(c[3], c[5]));
+    expect(nouns.length).toBeGreaterThan(2900);
+    expect(drillable.length).toBeGreaterThan(2400);
+  });
+
+  it('gives every noun an article for the gender drill', () => {
+    const nouns = cards.filter((c) => /^(der|die|das)\s/i.test(c[3]));
+    for (const c of nouns) expect(c[3]).toMatch(/^(der|die|das)\s+\S/);
+  });
+});

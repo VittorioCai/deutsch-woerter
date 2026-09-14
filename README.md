@@ -4,11 +4,16 @@ A German vocabulary trainer for *Netzwerk neu* A1–B1, published as an installa
 offline PWA at
 [vittoriocai.github.io/deutsch-woerter](https://vittoriocai.github.io/deutsch-woerter/).
 
-Two modes over the same 5452-word deck:
+Over the same 5452-word deck:
 
+- **今日任务** — one button: every word due for review across all Kapitel, plus a
+  few new ones. Spaced repetition is supposed to decide what you study; the
+  chapter pickers are there when you want them, not on the daily path.
 - **学新词** — staged learning per Kapitel: meet the word, recognise its meaning,
   recall the German, then spell it, with spaced review between sessions.
 - **单词检测** — the quiz: weak words first, both directions, spelling checked.
+- **语法专项** — der/die/das over 3020 nouns, and plural forms over ~2550. Both
+  read fields the app previously only displayed.
 
 Progress, the spelling wrong-book, and the mastered archive live in the browser's
 `localStorage` and never leave the device. Export a backup from the home screen.
@@ -39,6 +44,7 @@ written to `dist/`. It runs as part of `npm run dev`, `npm test`, and
 | `src/learn.core.js`, `src/wrongbook-addon.js`, `src/mastered-addon.js` | `learn.js` |
 | `src/store.js` | `store.js` |
 | `src/sw.source.js` | `sw.js` |
+| `src/drills-addon.js` | folded into `learn.js` |
 | `src/data/cards-mini-*.txt` | `cards.json` |
 | `src/data/zh-*.json` | `zh.json` |
 
@@ -60,6 +66,14 @@ people's browsers.
   `src/data/zh-*.json` fails the build, and the error names the file to fix. This
   is deliberate: the mapping used to happen at runtime, where an off-by-one would
   silently mislabel every remaining word instead of failing.
+
+**Plural forms are derived, not stored.** The Glossar writes them compactly — a
+leading `"` or `*` marks an umlaut of the last stem vowel, `-` stands for the
+singular, and the rest is the suffix, so `die Stadt "e` becomes `die Städte`.
+A word with no marker, or an ambiguous one, produces no question rather than a
+guess: a wrong plural would actively teach an error. `tests/data.test.ts` checks
+the derivation against a list of known forms, umlauts included, and against nouns
+like `das Wort` that have two correct plurals with different senses.
 
 The service worker's cache name is a hash of the files it caches, so any deploy
 that changes an asset invalidates it automatically. Nothing is version-bumped by

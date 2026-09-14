@@ -81,7 +81,7 @@ writeFileSync(new URL('zh.json', out), JSON.stringify(zh));
 const read = (name) => readFileSync(new URL(name, src), 'utf8').trim();
 writeFileSync(
   new URL('learn.js', out),
-  `(()=>{\n${read('learn.core.js')}\n${read('wrongbook-addon.js')}\n${read('mastered-addon.js')}\nLboot();\n})();\n`,
+  `(()=>{\n${read('learn.core.js')}\n${read('wrongbook-addon.js')}\n${read('mastered-addon.js')}\n${read('drills-addon.js')}\nLboot();\n})();\n`,
 );
 writeFileSync(new URL('store.js', out), `${read('store.js')}\n`);
 
