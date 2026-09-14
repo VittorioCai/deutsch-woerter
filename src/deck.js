@@ -237,11 +237,11 @@ const DWDeck = (() => {
     if (!rec || !Array.isArray(rec.cards) || !rec.cards.length) return null;
     // Old records could predate a field; rebuilding the ids here would be wrong
     // (they are the saved identity), so only fill in what is cosmetic.
-    return { name: rec.name || "我的词库", savedAt: rec.savedAt || 0, cards: rec.cards };
+    return { name: rec.name || "我的词库", savedAt: rec.savedAt || 0, source: rec.source || "", cards: rec.cards };
   }
 
   async function save(deck) {
-    const rec = { name: deck.name || "我的词库", savedAt: Date.now(), cards: deck.cards };
+    const rec = { name: deck.name || "我的词库", savedAt: Date.now(), source: deck.source || "", cards: deck.cards };
     await tx("readwrite", (s) => s.put(rec, KEY));
     return rec;
   }

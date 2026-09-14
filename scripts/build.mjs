@@ -4,7 +4,11 @@ import { createHash } from 'node:crypto';
 const src = new URL('../src/', import.meta.url);
 const out = new URL('../dist/', import.meta.url);
 
-const STATIC = ['index.html', 'learn.css', 'icon.svg', 'app.webmanifest'];
+// starter-deck.json is the only vocabulary in the repository: ~280 common German
+// words written for this project, MIT-licensed like the rest of it. It is what the
+// 「立即试用」 button loads, so a first-time visitor is learning within seconds
+// instead of being asked to produce a file first.
+const STATIC = ['index.html', 'learn.css', 'icon.svg', 'app.webmanifest', 'starter-deck.json'];
 
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
@@ -21,8 +25,8 @@ writeFileSync(
 writeFileSync(new URL('store.js', out), `${read('store.js')}\n`);
 writeFileSync(new URL('deck.js', out), `${read('deck.js')}\n`);
 
-// No vocabulary is built into the app. The word list is imported by the person
-// using it and lives in their browser's IndexedDB — see README.md.
+// No textbook vocabulary is built into the app: a learner's own word list is
+// imported by them and lives in their browser's IndexedDB — see README.md.
 
 // ---- service worker --------------------------------------------------------
 // The cache name is derived from the content it caches, so a deploy can never

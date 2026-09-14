@@ -949,3 +949,40 @@ test('an unreadable file is refused with a reason, leaving the deck alone', asyn
   expect(dialogs.join('\n')).toMatch(/de/);
   expect((await deck(page)).length).toBe(before);
 });
+
+test('the demo deck is one click away and is a working app, not a sample', async ({ page }) => {
+  await page.goto(APP);
+  // The first screen a stranger sees must not be a file picker: asking for a word
+  // list before showing anything is how a visitor becomes a bounce.
+  await expect(page.locator('#deckDemoBtn')).toBeVisible();
+  await page.locator('#deckDemoBtn').click();
+  await ready(page);
+
+  const cards = await deck(page);
+  expect(cards.length).toBeGreaterThan(250);
+  await expect(page.locator('#deckInfo')).toContainText('示例词库');
+  await expect(page.locator('#deckInfo')).toContainText('更换词库');
+
+  // every mode has enough data to actually run
+  await page.locator('#goLearn').click();
+  expect(await page.locator('#learnLevel option').allTextContents()).toEqual(['A1', 'A2']);
+  await page.locator('#learnStartBtn').click();
+  await expect(page.locator('#learnBody .learnZh')).not.toHaveText('');
+  await page.locator('#modeBack').click();
+
+  await page.locator('#goQuiz').click();
+  await page.locator('#startBtn').click();
+  await expect(page.locator('#prompt')).not.toHaveText('');
+  await page.locator('#modeBack').click();
+
+  await page.locator('#goLearn').click();
+  await page.locator('#learnDrillBtn').click();
+  await expect(page.locator('#drillStart')).toBeEnabled();
+  await page.locator('#tabPlural').click();
+  await expect(page.locator('#drillStart')).toBeEnabled();
+
+  // and it survives the reload, like any imported deck
+  await page.reload();
+  await ready(page);
+  await expect(page.locator('#deckGate')).toBeHidden();
+});

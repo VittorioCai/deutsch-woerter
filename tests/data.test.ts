@@ -223,6 +223,27 @@ describe('plural derivation', () => {
     expect(plural('das Ding', '"-e')).toBeNull();
   });
 
+  it('never ships a plural the drill would derive differently', () => {
+    // starter-deck.json is the app's own vocabulary, loaded by the 「立即开始背词」
+    // button. A noun whose written plural and derived plural disagree would be the
+    // app teaching its own mistake.
+    const { cards } = DWDeck.parse(readFileSync(new URL('../src/starter-deck.json', import.meta.url), 'utf8'), 'starter-deck.json');
+    const nouns = cards.filter((c) => /^(der|die|das)\s/.test(c.de));
+    const written = nouns.filter((c) => c.grammar);
+    const wrong = written
+      .map((c) => ({ de: c.de, want: c.grammar!.replace(/^Plural:\s*/, ''), got: plural(c.de, c.grammar!) }))
+      .filter((r) => r.got !== r.want);
+    expect(wrong).toEqual([]);
+    expect(cards.length).toBeGreaterThan(250);
+    expect(written.length).toBeGreaterThan(100);
+    // all three genders, or the der/die/das drill is a coin toss
+    for (const art of ['der ', 'die ', 'das ']) {
+      expect(nouns.filter((c) => c.de.startsWith(art)).length, art).toBeGreaterThan(30);
+    }
+    // and every card can actually be asked about in both directions
+    for (const c of cards) { expect(c.de.trim()).not.toBe(''); expect(c.en || c.zh).toBeTruthy(); }
+  });
+
   it('drives the drill off the deck that is actually loaded', () => {
     const { cards } = DWDeck.parse(FIXTURE, 'fixture.json');
     const nouns = cards.filter((c) => /^(der|die|das)\s/i.test(c.de));
