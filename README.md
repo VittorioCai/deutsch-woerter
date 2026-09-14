@@ -82,6 +82,15 @@ guess: a wrong plural would actively teach an error. `tests/data.test.ts` checks
 the derivation against a list of known forms, umlauts included, and against nouns
 like `das Wort` that have two correct plurals with different senses.
 
+Pronunciation uses the Web Speech API with an explicitly chosen voice. Setting
+only the language left the browser on its default German voice — the old compact
+one on Apple devices — while better voices were usually installed and simply not
+asked for. Voices are ranked (premium, enhanced/neural, Google's network voice,
+then anything), the best is used by default, and the learner can override it. A
+static site cannot do better than this: cloud text-to-speech needs an API key,
+which a client-side app cannot keep secret, and recorded audio for 5452 words is
+neither licensable nor small.
+
 The service worker's cache name is a hash of the files it caches, so any deploy
 that changes an asset invalidates it automatically. Nothing is version-bumped by
 hand — a stale cache name used to pin returning visitors to old JavaScript.

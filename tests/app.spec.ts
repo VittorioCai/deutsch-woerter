@@ -641,3 +641,92 @@ test('the two spelling toggles stay in sync', async ({ page }) => {
   await expect(page.locator('#homeSpellToggle')).toBeChecked();
   await expect(page.locator('#homeSpellHint')).toHaveText('');
 });
+
+test('speech picks the best German voice the device has', async ({ page }) => {
+  // A realistic Apple + Google mix: the default the browser would have chosen is
+  // the compact one, which is exactly what made pronunciation sound robotic.
+  await page.addInitScript(() => {
+    (window as any).__spoken = [];
+    const voices = [
+      { name: 'Anna (Compact)', lang: 'de-DE', voiceURI: 'anna-compact', localService: true },
+      { name: 'Grandma (German (Germany))', lang: 'de-DE', voiceURI: 'grandma', localService: true },
+      { name: 'Anna (Enhanced)', lang: 'de-DE', voiceURI: 'anna-enhanced', localService: true },
+      { name: 'Google Deutsch', lang: 'de-DE', voiceURI: 'google-de', localService: false },
+      { name: 'Anna (Premium)', lang: 'de-DE', voiceURI: 'anna-premium', localService: true },
+      { name: 'Markus', lang: 'de-AT', voiceURI: 'markus-at', localService: true },
+      { name: 'Samantha', lang: 'en-US', voiceURI: 'sam', localService: true },
+    ];
+    Object.defineProperty(window, 'speechSynthesis', {
+      configurable: true,
+      value: {
+        cancel() {},
+        addEventListener() {},
+        getVoices: () => voices,
+        speak: (u: any) => (window as any).__spoken.push({ text: u.text, voice: u.voice?.voiceURI, rate: u.rate }),
+      },
+    });
+    (window as any).SpeechSynthesisUtterance = class { text: string; lang = ''; rate = 1; voice: unknown = null; constructor(t: string) { this.text = t } };
+  });
+  await page.goto(APP);
+  await ready(page);
+  await page.locator('#goLearn').click();
+
+  // English is excluded; the premium German voice wins
+  const options = await page.locator('#voicePick option').allTextContents();
+  expect(options.some((o) => /Samantha/.test(o))).toBe(false);
+  expect(options[0]).toContain('Premium');
+  expect(options[0]).toContain('★');
+
+  await page.locator('#voiceTest').click();
+  const first = await page.evaluate(() => (window as any).__spoken[0]);
+  expect(first.voice).toBe('anna-premium');
+  expect(first.rate).toBe(0.85);
+
+  // an explicit choice is honoured and persists
+  await page.selectOption('#voicePick', 'google-de');
+  await page.selectOption('#voiceRate', '0.7');
+  await page.evaluate(() => (window as any).DWStore.flush());
+  await page.reload();
+  await ready(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#voiceTest').click();
+  const after = await page.evaluate(() => {
+    const s = (window as any).__spoken as Array<{ voice: string; rate: number }>;
+    return s[s.length - 1];
+  });
+  expect(after.voice).toBe('google-de');
+  expect(after.rate).toBe(0.7);
+});
+
+test('says how to get a better voice when only basic ones exist', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'speechSynthesis', {
+      configurable: true,
+      value: {
+        cancel() {}, addEventListener() {}, speak() {},
+        getVoices: () => [{ name: 'Anna (Compact)', lang: 'de-DE', voiceURI: 'anna-compact', localService: true }],
+      },
+    });
+    (window as any).SpeechSynthesisUtterance = class { text: string; lang = ''; rate = 1; voice: unknown = null; constructor(t: string) { this.text = t } };
+  });
+  await page.goto(APP);
+  await ready(page);
+  await page.locator('#goLearn').click();
+  await expect(page.locator('#voiceHint')).toContainText('基础音质');
+  await expect(page.locator('#voiceHint')).toContainText(/设置|系统设置|Chrome/);
+});
+
+test('handles a device with no German voice at all', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'speechSynthesis', {
+      configurable: true,
+      value: { cancel() {}, addEventListener() {}, speak() {}, getVoices: () => [{ name: 'Samantha', lang: 'en-US', voiceURI: 'sam', localService: true }] },
+    });
+    (window as any).SpeechSynthesisUtterance = class { text: string; lang = ''; rate = 1; voice: unknown = null; constructor(t: string) { this.text = t } };
+  });
+  await page.goto(APP);
+  await ready(page);
+  await page.locator('#goLearn').click();
+  await expect(page.locator('#voicePick')).toBeDisabled();
+  await expect(page.locator('#voiceHint')).toContainText('没有德语语音');
+});
