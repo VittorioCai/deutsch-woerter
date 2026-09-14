@@ -13,3 +13,5 @@
 .wordRow,.answerRow{display:flex;align-items:center;justify-content:center;gap:9px;flex-wrap:wrap}
 .answerRow{justify-content:flex-start}
 .speakBtn{margin-left:0}
+.homeSpellRow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-4px 2px 14px}
+.homeSpellRow .small{color:var(--accent);font-weight:700}

@@ -516,7 +516,7 @@ test('spelling can be switched off without stalling review pacing', async ({ pag
   for (let step = 0; step < 40; step++) {
     const badge = (await page.locator('#learnBadge').textContent()) || '';
     if (/本轮完成/.test(badge)) break;
-    stages.push(badge.split(' · ')[0].trim());
+    stages.push(badge);
     if (await page.locator('#learnRemember').count()) { await page.locator('#learnRemember').click(); continue }
     if (await page.locator('#learnBody .choice').count()) { await answerCorrectly(); continue }
     break;
@@ -524,6 +524,9 @@ test('spelling can be switched off without stalling review pacing', async ({ pag
   // no spelling stage was ever queued, and the input never appeared
   expect(stages.filter((s) => /主动拼写/.test(s))).toHaveLength(0);
   expect(stages.filter((s) => /认识新词/.test(s)).length).toBe(5);
+  // guard against the assertion above going vacuous again: the same walk with
+  // spelling on must find the stage
+  expect(stages.some((s) => /看意思认出德语|第 2 层/.test(s))).toBe(true);
 
   // Linterval keys off cycles, which only advanced on a correct spelling. If the
   // round never closed, every word would sit on the 10-minute step and come back
@@ -558,4 +561,83 @@ test('a word cannot reach mastered while spelling is off', async ({ page }) => {
   await expect(page.locator('#homeMastered')).toHaveText('0');
   // and it is still offered for review rather than archived
   await expect(page.locator('#todayBreak')).toContainText('到期复习');
+});
+
+
+test('the spelling toggle reaches review and the daily session too', async ({ page }) => {
+  await page.goto(APP);
+  await ready(page);
+  const cards = await deck(page);
+  const due = cards.filter((c) => c.level === 'A1' && String(c.chapter) === '1').slice(0, 8).map((c) => c.id);
+  const seed = async (spelling: boolean) => {
+    await page.evaluate(([learnKey, schemaKey, prefsKey, ids, spelling]) => {
+      const learn: Record<string, unknown> = {};
+      for (const id of ids as string[]) {
+        learn[id] = { introduced: true, strength: 3, wrong: 0, hard: 0, last: 1, due: 1, spellingPass: false, cycles: 1, known: false };
+      }
+      localStorage.setItem(learnKey as string, JSON.stringify(learn));
+      localStorage.setItem(schemaKey as string, '2');
+      localStorage.setItem(prefsKey as string, JSON.stringify({ spelling }));
+    }, [LEARN_KEY, SCHEMA_KEY, 'netzwerk_vocab_prefs_v1', due, spelling] as const);
+    await page.reload();
+    await ready(page);
+  };
+  // The badge is "第 3 层 · 主动拼写 · 5/24"; match the whole string, not a field.
+  const walk = async () => {
+    let total = 0, spell = 0;
+    for (let i = 0; i < 80; i++) {
+      const badge = (await page.locator('#learnBadge').textContent()) || '';
+      if (/本轮完成/.test(badge)) break;
+      total++;
+      if (/主动拼写/.test(badge)) spell++;
+      if (await page.locator('#learnRemember').count()) { await page.locator('#learnRemember').click(); continue }
+      if (await page.locator('#learnBody .choice').count()) {
+        await page.locator('#learnBody .choice').first().click();
+        await page.locator('#learnNextBtn').click();
+        continue;
+      }
+      if (await page.locator('#learnAnswer').count()) {
+        await page.locator('#learnAnswer').fill('zzz');
+        await page.locator('#learnSubmit').click();
+        await page.locator('#learnNextBtn').click();
+        continue;
+      }
+      break;
+    }
+    return { total, spell };
+  };
+
+  await seed(true);
+  await page.locator('#goLearn').click();
+  await page.locator('#learnReviewBtn').click();
+  const withSpelling = await walk();
+  expect(withSpelling.spell).toBeGreaterThan(0);
+
+  await seed(false);
+  await page.locator('#goLearn').click();
+  await page.locator('#learnReviewBtn').click();
+  const withoutSpelling = await walk();
+  expect(withoutSpelling.spell).toBe(0);
+  expect(withoutSpelling.total).toBeLessThan(withSpelling.total);
+
+  // 今日任务 starts from the home screen, so the setting has to be reachable there
+  await seed(false);
+  await expect(page.locator('#homeSpellToggle')).toBeVisible();
+  await expect(page.locator('#homeSpellToggle')).not.toBeChecked();
+  await expect(page.locator('#homeSpellHint')).toContainText('已关闭拼写');
+  await page.locator('#goToday').click();
+  expect((await walk()).spell).toBe(0);
+});
+
+test('the two spelling toggles stay in sync', async ({ page }) => {
+  await page.goto(APP);
+  await ready(page);
+  await expect(page.locator('#homeSpellToggle')).toBeChecked();
+  await page.locator('#homeSpellToggle').uncheck();
+  await page.locator('#goLearn').click();
+  await expect(page.locator('#learnSpellToggle')).not.toBeChecked();
+  await page.locator('#learnSpellToggle').check();
+  await page.locator('#modeBack').click();
+  await expect(page.locator('#homeSpellToggle')).toBeChecked();
+  await expect(page.locator('#homeSpellHint')).toHaveText('');
 });

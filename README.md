@@ -11,9 +11,10 @@ Over the same 5452-word deck:
   chapter pickers are there when you want them, not on the daily path.
 - **学新词** — staged learning per Kapitel: meet the word, recognise its meaning,
   recall the German, then spell it, with spaced review between sessions. Spelling
-  can be switched off for a recognition-only session; those words still advance
-  through the review intervals but cannot reach 已掌握, which in this app means
-  you can produce the word, not just recognise it.
+  can be switched off for a recognition-only session — from the home screen as
+  well as the learning panel, since 今日任务 starts from the home screen. Those
+  words still advance through the review intervals but cannot reach 已掌握, which
+  in this app means you can produce the word, not just recognise it.
 - **单词检测** — the quiz: weak words first, both directions, spelling checked.
 - **专项训练** — der/die/das over 3020 nouns, plural forms over ~2550, and
   dictation. The first two read fields the app previously only displayed.
