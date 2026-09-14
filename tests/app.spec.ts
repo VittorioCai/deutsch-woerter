@@ -18,6 +18,10 @@ const deck = async (page: Page): Promise<Array<{ id: string; level: string; chap
     return rows.map((r: string[]) => ({ id: r[0], level: r[1], chapter: r[2], de: r[3] }));
   });
 
+test.beforeEach(async ({ page }) => {
+  await page.route('**://*.wikimedia.org/**', (route) => route.abort('failed'));
+});
+
 const ready = async (page: Page) => {
   await expect(page.locator('#homeView')).toBeVisible();
   await expect(page.locator('#learnStartBtn')).toHaveText('开始学新词', { timeout: 20000 });
