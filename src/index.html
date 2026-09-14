@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#315efb">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Deutsch Wörter">
+<link rel="manifest" href="./app.webmanifest">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./learn.css">
+<script src="./store.js"></script>
+<title>Netzwerk neu A1–B1 单词检测</title>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--ink:#172033;--muted:#697386;--line:#e5e8ef;--accent:#315efb;--good:#0a8f55;--bad:#c73737;--soft:#eef2ff;--shadow:0 14px 40px rgba(30,42,70,.10)}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Noto Sans SC",Arial,sans-serif}.wrap{max-width:860px;margin:0 auto;padding:20px 14px 80px}h1{font-size:clamp(25px,6vw,38px);margin:8px 0 6px}.sub{color:var(--muted);line-height:1.6;margin-bottom:16px}.panel,.quiz{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}.panel{padding:15px;margin:14px 0}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted)}select,input[type=text]{width:100%;border:1px solid #cfd5e2;border-radius:12px;background:#fff;color:var(--ink);font-size:16px;padding:12px}button{border:0;border-radius:12px;padding:12px 16px;font-size:15px;font-weight:700;cursor:pointer}.primary{background:var(--accent);color:#fff}.secondary{background:#eef1f6;color:var(--ink)}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}.stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:11px;text-align:center}.stat b{display:block;font-size:20px}.stat span{font-size:12px;color:var(--muted)}.quiz{padding:22px;min-height:355px;display:flex;flex-direction:column;justify-content:center;scroll-margin-top:12px}.badge{display:inline-flex;align-items:center;gap:6px;background:var(--soft);color:#4052a5;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:700;width:max-content}.prompt{font-size:clamp(25px,6vw,42px);font-weight:800;line-height:1.2;margin:22px 0 7px}.hint{color:var(--muted);margin-bottom:18px;min-height:24px}.answerBox{display:flex;gap:8px}.answerBox input{flex:1}.feedback{margin-top:16px;border-radius:14px;padding:14px;display:none;line-height:1.55}.feedback.show{display:block}.feedback.ok{background:#edf9f3;border:1px solid #bfe9d4}.feedback.no{background:#fff2f2;border:1px solid #f2c4c4}.deAnswer{font-size:23px;font-weight:800;margin-bottom:4px}.meta{font-size:13px;color:var(--muted)}.example{margin-top:8px;padding:10px 12px;border-left:3px solid #b4bee0;background:#fafbff;border-radius:8px}.progress{height:8px;background:#e9edf5;border-radius:99px;overflow:hidden;margin:10px 0 4px}.progress>div{height:100%;background:var(--accent);width:0%}.small{font-size:12px;color:var(--muted);line-height:1.5}.switch{flex-direction:row;align-items:center;gap:7px;color:var(--ink);font-size:14px}.nextRow{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom));z-index:10;padding-top:10px;background:linear-gradient(to bottom,rgba(255,255,255,0),#fff 26%)}#nextBtn{width:100%;min-height:50px;box-shadow:0 8px 22px rgba(49,94,251,.18)}.tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.tools button{flex:1 1 150px}.install{background:#111827;color:#fff}.loading{padding:16px;border-radius:14px;background:#fff;border:1px solid var(--line);color:var(--muted);margin:14px 0}.dots{display:flex;gap:4px;margin-top:7px}.dot{width:9px;height:9px;border-radius:50%;background:#d9deea}.dot.on{background:#4a69ff}#fileImport{display:none}.dwNotice{display:grid;gap:8px}.dwNotice:not(:empty){margin:12px 0}.dwNoticeItem{border-radius:14px;padding:12px 14px;font-size:14px;line-height:1.6;border:1px solid}.dwNoticeItem.ok{background:#edf9f3;border-color:#bfe9d4}.dwNoticeItem.warn{background:#fff8e8;border-color:#f0dcae}.dwNoticeItem.bad{background:#fff2f2;border-color:#f2c4c4}.dwNoticeItem code{font-size:12px;background:rgba(0,0,0,.06);padding:1px 5px;border-radius:5px}.dwNoticeActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.dwNoticeActions button{padding:8px 12px;font-size:13px}
+@media(max-width:680px){.grid{grid-template-columns:1fr 1fr}.stats{grid-template-columns:1fr 1fr}.quiz{padding:18px}.answerBox{flex-direction:column}.tools button{flex-basis:100%}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Netzwerk neu A1–B1 单词检测</h1>
+<div class="sub">基于你整理的 Netzwerk neu A1 / A2 / B1 全量词库。错词会提高抽取概率，学习记录保存在本机；安装后可以像 App 一样离线使用。</div>
+<div id="loading" class="loading">正在加载词库…</div>
+<div id="app" style="display:none">
+<div class="panel">
+  <div class="grid">
+    <label>级别<select id="level"><option value="ALL">A1 + A2 + B1</option><option>A1</option><option>A2</option><option>B1</option></select></label>
+    <label>章节<select id="chapter"><option value="ALL">全部章节</option></select></label>
+    <label>方向<select id="direction"><option value="en-de">英文 → 德语</option><option value="de-en">德语 → 英文</option></select></label>
+    <label>本轮题数<select id="count"><option>10</option><option selected>20</option><option>30</option><option>50</option><option>100</option><option>200</option></select></label>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <label class="switch"><input id="weakFirst" type="checkbox" checked> 优先抽错词 / 生词</label>
+    <label class="switch"><input id="strictArticle" type="checkbox"> 名词严格检查冠词</label>
+    <button class="primary" id="startBtn">开始新一轮</button>
+    <button class="secondary" id="weakBtn">只练错词</button>
+    <button class="secondary" id="resetBtn">清空检测记录</button>
+  </div>
+  <div class="tools">
+    <button class="install" id="installBtn" style="display:none">安装到手机桌面</button>
+    <button class="secondary" id="exportBtn">导出学习记录</button>
+    <button class="secondary" id="importBtn">导入学习记录</button>
+    <input id="fileImport" type="file" accept="application/json,.json">
+  </div>
+  <div class="small" id="appStatus"></div>
+  <div class="small" id="bankInfo"></div>
+</div>
+<div class="stats">
+  <div class="stat"><b id="sNow">0/0</b><span>本轮进度</span></div>
+  <div class="stat"><b id="sAcc">—</b><span>本轮正确率</span></div>
+  <div class="stat"><b id="sStreak">0</b><span>连续答对</span></div>
+  <div class="stat"><b id="sWeak">0</b><span>历史错词</span></div>
+</div>
+<div class="quiz">
+  <span class="badge" id="badge">准备开始</span>
+  <div class="progress"><div id="bar"></div></div>
+  <div class="prompt" id="prompt">选择级别后点击“开始新一轮”</div>
+  <div class="hint" id="hint">输入答案后按 Enter 提交；键盘会自动收起。</div>
+  <div class="answerBox">
+    <input id="answer" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="done" placeholder="输入答案…" disabled>
+    <button class="primary" id="submitBtn" disabled>检查</button>
+    <button class="secondary" id="showBtn" disabled>不会 / 看答案</button>
+  </div>
+  <div id="feedback" class="feedback"></div>
+  <div class="row nextRow" style="margin-top:14px"><button class="primary" id="nextBtn" style="display:none">下一题</button></div>
+</div>
+</div>
+</div>
+<script>
+let CARDS=[];
+const STORE_KEY=DWStore.KEYS.QUIZ;
+let progress=DWStore.read(STORE_KEY,{});
+DWStore.onMigrated(()=>{progress=DWStore.read(STORE_KEY,{})});
+let pool=[],session=[],index=0,correct=0,streak=0,answered=false;
+const $=id=>document.getElementById(id);
+const norm=s=>(s||"").toLowerCase().trim().replace(/[|·.,;:!?()[\]{}“”„"']/g," ").replace(/\s+/g," ").replace(/ß/g,"ss");
+const withoutArticle=s=>norm(s).replace(/^(der|die|das)\s+/,"");
+const isNoun=c=>/^(der|die|das)\s/i.test(c.de);
+const cleanGloss=s=>norm((s||"").replace(/^[_\-–—\s]+/,"")).replace(/\s*\([^)]*\)\s*$/," ").trim();
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]));
+function mergeProgress(mine,theirs,stamp){const out={...mine};for(const[k,v]of Object.entries(theirs||{})){if(!v||typeof v!=="object")continue;const cur=out[k];out[k]=!cur||(+(v[stamp]||0)>=+(cur[stamp]||0))?v:cur}return out}
+window.mergeProgress=mergeProgress;
+function state(c){return progress[c.id]||{seen:0,correct:0,wrong:0,mastery:0,last:0}}
+function save(c,ok){const s=state(c);s.seen++;s.last=Date.now();if(ok){s.correct++;s.mastery=Math.min(5,(s.mastery||0)+1)}else{s.wrong++;s.mastery=Math.max(0,(s.mastery||0)-1)}progress[c.id]=s;DWStore.queue(STORE_KEY,()=>progress)}
+function nounAlts(c){if(!isNoun(c))return[c];const g=cleanGloss(c.en);return CARDS.filter(x=>x.level===c.level&&isNoun(x)&&cleanGloss(x.en)===g)}
+function filtered(){const l=$("level").value,ch=$("chapter").value;return CARDS.filter(c=>(l==="ALL"||c.level===l)&&(ch==="ALL"||String(c.chapter)===ch))}
+function chapters(){const l=$("level").value,chs=[...new Set(CARDS.filter(c=>l==="ALL"||c.level===l).map(c=>String(c.chapter)))].sort((a,b)=>+a-+b);$("chapter").innerHTML='<option value="ALL">全部章节</option>'+chs.map(x=>`<option value="${x}">Kapitel ${x}</option>`).join("");bank()}
+function bank(){const n=filtered().length,by={A1:0,A2:0,B1:0};CARDS.forEach(c=>by[c.level]++);$("bankInfo").textContent=`当前筛选：${n} 词｜题库：A1 ${by.A1} · A2 ${by.A2} · B1 ${by.B1} · 总计 ${CARDS.length}`;$("sWeak").textContent=Object.values(progress).filter(s=>s.wrong>0&&s.mastery<4).length}
+function weighted(a){return a.map(c=>{const s=state(c),p=$("weakFirst").checked?(6-(s.mastery||0))+Math.min(4,s.wrong||0):1;return{c,k:Math.random()**(1/Math.max(1,p))}}).sort((a,b)=>b.k-a.k).map(x=>x.c)}
+function bring(el,block="nearest"){if(!el)return;requestAnimationFrame(()=>{const r=el.getBoundingClientRect(),vh=innerHeight||document.documentElement.clientHeight;if(r.top<8||r.bottom>vh-8){try{el.scrollIntoView({behavior:"smooth",block})}catch(e){el.scrollIntoView()}}})}
+function start(weak=false){pool=filtered();if(weak)pool=pool.filter(c=>{const s=state(c);return s.wrong>0&&s.mastery<4});if(!pool.length){alert(weak?"当前筛选下还没有错词。":"当前筛选没有词条。");return}session=weighted(pool).slice(0,Math.min(+$("count").value,pool.length));index=correct=streak=0;answered=false;$("answer").disabled=$("submitBtn").disabled=$("showBtn").disabled=false;question();bring(document.querySelector(".quiz"),"start")}
+function question(){if(index>=session.length)return finish();answered=false;const c=session[index],d=$("direction").value;$("badge").textContent=`${c.level} · Kapitel ${c.chapter}`;$("prompt").textContent=(d==="en-de"?c.en:c.de).replace(/^[_\-–—\s]+/,"").trim();$("hint").textContent=d==="en-de"?"请输入德语。":"请输入英文核心意思。";$("answer").value="";$("feedback").className="feedback";$("feedback").innerHTML="";$("nextBtn").style.display="none";$("submitBtn").style.display=$("showBtn").style.display="";try{$('answer').focus({preventScroll:true})}catch(e){$('answer').focus()}stats()}
+const enBase=s=>String(s||"").replace(/^\s*(?:here|hier)\s*:\s*/i,"");
+const enForms=s=>{const out=new Set(),b=norm(enBase(s)),n=norm(s);if(b)out.add(b);if(n)out.add(n);const st=b.replace(/^(?:to|the|a|an)\s+/,"").trim();if(st)out.add(st);return out};
+function accepted(c,input){const d=$("direction").value;if(d==="de-en"){const a=enForms(input),t=enBase(c.en);const parts=t.split(/\s*\/\s*|\s*,\s*/).map(x=>x.trim()).filter(Boolean);parts.push(t);for(const p of parts)for(const f of enForms(p))if(f&&a.has(f))return true;return false}const a=norm(input),t=norm(c.de);if(a===t)return true;if(isNoun(c)){for(const alt of nounAlts(c)){const at=norm(alt.de);if(a===at)return true;if(!$("strictArticle").checked&&withoutArticle(a)===withoutArticle(at))return true}}return a.replace(/\s/g,"")===t.replace(/\s/g,"")}
+function reveal(ok){if(answered)return;answered=true;const c=session[index];if(ok){correct++;streak++}else streak=0;save(c,ok);const s=state(c),alts=nounAlts(c);let dots="";for(let i=0;i<5;i++)dots+=`<span class="dot ${i<(s.mastery||0)?"on":""}"></span>`;const fb=$("feedback");fb.className="feedback show "+(ok?"ok":"no");fb.innerHTML=`<div><b>${ok?"✓ 正确":"✗ 需要复习"}</b></div><div class="deAnswer">${esc(c.de)}</div><div>${esc(c.en.replace(/^[_\-–—\s]+/,"").trim())}</div>${isNoun(c)&&alts.length>1?`<div class="meta">可接受名词答案：${alts.map(x=>esc(x.de)).join(" / ")}</div>`:""}${c.grammar?`<div class="meta">${esc(c.grammar)}</div>`:""}${c.example?`<div class="example">${esc(c.example)}</div>`:""}<div class="dots">${dots}</div>`;$("submitBtn").style.display=$("showBtn").style.display="none";$("nextBtn").style.display="";stats();bring($("nextBtn"),"end")}
+function check(){const v=$("answer").value.trim();if(!v)return;reveal(accepted(session[index],v))}
+function finish(){const n=session.length,a=n?Math.round(correct/n*100):0;$("badge").textContent="本轮完成";$("bar").style.width="100%";$("prompt").textContent=`${correct} / ${n} 正确`;$("hint").textContent=`正确率 ${a}%。可以再点“只练错词”。`;$("answer").disabled=$("submitBtn").disabled=$("showBtn").disabled=true;$("feedback").className="feedback";$("nextBtn").style.display="none";stats(true)}
+function stats(done=false){const n=session.length||0,shown=done?n:Math.min(index+1,n),att=done?n:index+(answered?1:0);$("sNow").textContent=`${shown}/${n}`;$("sAcc").textContent=att?Math.round(correct/att*100)+"%":"—";$("sStreak").textContent=streak;$("sWeak").textContent=Object.values(progress).filter(s=>s.wrong>0&&s.mastery<4).length;$("bar").style.width=n?`${Math.min(100,((index+(answered?1:0))/n)*100)}%`:"0%";bank()}
+async function loadCards(){$("loading").textContent="正在加载词库…";try{const r=await fetch("./cards.json",{cache:"no-store"});if(!r.ok)throw new Error(`HTTP ${r.status}`);const rows=await r.json();if(!Array.isArray(rows)||!rows.length)throw new Error("词库内容无效");CARDS=rows.map(r=>({id:r[0],level:r[1],chapter:r[2],de:r[3],en:r[4],grammar:r[5]||"",example:r[6]||""}));DWStore.migrate(CARDS);$("loading").style.display="none";$("app").style.display="";chapters();stats();return CARDS}catch(e){console.error(e);$("loading").innerHTML=`<b>词库加载失败：</b>${String(e&&e.message||e)}<div class="dwNoticeActions"><button class="primary" id="retryLoad">重新加载</button></div>`;$("loading").style.display="";const b=$("retryLoad");if(b)b.onclick=()=>loadCards();throw e}}
+$("startBtn").onclick=()=>start(false);$("weakBtn").onclick=()=>start(true);$("resetBtn").onclick=()=>{if(confirm("确定清空本机的「单词检测」记录吗？\n\n背词模式的学习进度不受影响。")){progress={};DWStore.queue(STORE_KEY,()=>progress);DWStore.flush();stats();bank()}};$("submitBtn").onclick=()=>{$("answer").blur();check()};$("showBtn").onclick=()=>{$("answer").blur();reveal(false)};$("nextBtn").onclick=()=>{index++;question();bring(document.querySelector(".quiz"),"start")};$("answer").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();if(answered)$("nextBtn").click();else{$("answer").blur();check()}}});$("level").onchange=chapters;$("chapter").onchange=bank;
+let deferred=null;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;$("installBtn").style.display="";$("appStatus").textContent="可以安装到手机桌面。"});$("installBtn").onclick=async()=>{if(!deferred)return;deferred.prompt();try{await deferred.userChoice}catch(e){}deferred=null;$("installBtn").style.display="none"};window.addEventListener("appinstalled",()=>$("appStatus").textContent="已安装到手机桌面。")
+function dl(name,obj){DWStore.download(name,obj)}$("exportBtn").onclick=()=>DWStore.exportBackup();$("importBtn").onclick=()=>$("fileImport").click();$("fileImport").onchange=async e=>{const f=e.target.files&&e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text()),p=d.quizProgress||d.progress||d;if(!p||typeof p!=="object"||Array.isArray(p))throw 0;progress=mergeProgress(progress,p,"last");DWStore.queue(STORE_KEY,()=>progress);DWStore.flush();stats();alert("学习记录已合并导入。")}catch(err){alert("无法识别这个备份文件。")}e.target.value=""}
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").then(r=>{$("appStatus").textContent="离线模式已启用。";r.update().catch(()=>{})}).catch(()=>{}));
+window.__cardsReady=loadCards();
+</script>
+<script src="./learn.js"></script>
+</body></html>
