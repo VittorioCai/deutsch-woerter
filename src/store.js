@@ -123,14 +123,14 @@
   addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flush(); });
 
   // ---- migration -----------------------------------------------------------
-  function download(name, obj) {
-    const b = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
-    const u = URL.createObjectURL(b);
+  function downloadText(name, text, type = "application/json") {
+    const u = URL.createObjectURL(new Blob([text], { type }));
     const a = document.createElement("a");
     a.href = u; a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(u), 500);
   }
+  const download = (name, obj) => downloadText(name, JSON.stringify(obj, null, 2));
 
   const api = {
     KEYS: { QUIZ, LEARN, WRONG },
@@ -253,6 +253,7 @@
 
     markBackedUp() { try { localStorage.setItem(BACKUP_AT, String(Date.now())); } catch (_) {} },
     download,
+    downloadText,
   };
 
   window.DWStore = api;

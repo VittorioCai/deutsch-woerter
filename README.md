@@ -1,26 +1,92 @@
 # Deutsch Wörter
 
-A German vocabulary trainer for *Netzwerk neu* A1–B1, published as an installable
-offline PWA at
+An installable, offline German vocabulary trainer. No account, no server, no
+tracking: everything — your word list and your progress — stays in your browser.
+
+Live at
 [vittoriocai.github.io/deutsch-woerter](https://vittoriocai.github.io/deutsch-woerter/).
 
-Over the same 5452-word deck:
+**It ships with no vocabulary.** You import your own word list once and it is
+stored on your device. That is a deliberate choice, not a missing feature: most
+usable word lists are somebody's copyrighted material, and publishing an app is
+not a licence to redistribute them. It also means the app works for any German
+course, not just the one it happened to be written for.
 
-- **今日任务** — one button: every word due for review across all Kapitel, plus a
+## What it does
+
+- **今日任务** — one button: every word due for review across all chapters, plus a
   few new ones. Spaced repetition is supposed to decide what you study; the
   chapter pickers are there when you want them, not on the daily path.
-- **学新词** — staged learning per Kapitel: meet the word, recognise its meaning,
+- **学新词** — staged learning per chapter: meet the word, recognise its meaning,
   recall the German, then spell it, with spaced review between sessions. Spelling
   can be switched off for a recognition-only session — from the home screen as
   well as the learning panel, since 今日任务 starts from the home screen. Those
   words still advance through the review intervals but cannot reach 已掌握, which
   in this app means you can produce the word, not just recognise it.
 - **单词检测** — the quiz: weak words first, both directions, spelling checked.
-- **专项训练** — der/die/das over 3020 nouns, plural forms over ~2550, and
-  dictation. The first two read fields the app previously only displayed.
+- **专项训练** — der/die/das, plural forms (derived from the grammar column), and
+  dictation.
+- **Pronunciation** — a recorded native pronunciation from Wikimedia Commons when
+  one exists for the word, falling back to the best German voice the device has.
 
-Progress, the spelling wrong-book, and the mastered archive live in the browser's
-`localStorage` and never leave the device. Export a backup from the home screen.
+## The word list
+
+Import from the first screen, or from 更换词库 later. Two formats:
+
+**A spreadsheet saved as CSV or TSV.** The first row is a header. Only `de` is
+required, and at least one of `zh` / `en`:
+
+```csv
+de,zh,en,level,chapter,grammar,example
+das Haus,房子,house,A1,1,Plural: Häuser,Das Haus ist alt.
+die Tür,门,door,A1,1,-en,
+```
+
+| Column | Meaning |
+| --- | --- |
+| `de` | the German word, with its article for nouns — required |
+| `zh` | Chinese meaning, shown as the primary gloss |
+| `en` | English meaning, used for the quiz and as a fallback gloss |
+| `level` | any label you like (`A1`, `B2`, `Beruf`…) — defaults to `A1` |
+| `chapter` | any label — defaults to `1` |
+| `grammar` | plural marker, e.g. `Plural: Häuser`, `-en`, `"-e` (`"` = umlaut) |
+| `example` | a sentence shown with the answer |
+
+German, English, Chinese and a few other spellings of the header names are
+accepted (`Deutsch`, `Kapitel`, `中文`, `释义`…).
+
+**JSON**, which is what 导出词库 produces:
+
+```json
+{"name":"Mein Wortschatz","cards":[{"de":"das Haus","zh":"房子","level":"A1","chapter":"1"}]}
+```
+
+[`tests/fixtures/deck.json`](tests/fixtures/deck.json) is a small working
+example.
+
+Rows that cannot be used are listed before the import goes ahead, never dropped
+quietly. Keep the row order stable: a word that appears twice in the same chapter
+is told apart from its twin by its position.
+
+## Your data
+
+Progress, the spelling wrong-book and the mastered archive live in
+`localStorage`; the word list lives in IndexedDB. Nothing is sent anywhere, which
+also means nothing is backed up for you:
+
+- **导出学习记录** writes a JSON backup. Do it every so often — a browser that
+  clears site data takes your history with it. The app nags after 30 days.
+- **导入学习记录** merges by default (newer record wins per word) rather than
+  replacing, so restoring a backup from another device cannot wipe this one.
+- **导出词库** writes your word list back out. Keep it somewhere you can reach
+  from your phone; you need it again on every new device.
+
+Progress is keyed by a hash of `level|chapter|de`, not by a row number, so adding
+or removing words never disturbs anything you have already learned — and a word
+that exists in two different decks keeps its history across a swap. That hash is
+computed identically in the browser and in `tests/data.test.ts`, with the
+expected values pinned as literals: if that test ever needs updating, somebody's
+learning history has just been orphaned.
 
 ## Local development
 
@@ -33,89 +99,45 @@ npm run dev                       # builds, then serves dist/ at 127.0.0.1:4321
 Before committing, run the same gate CI runs:
 
 ```sh
-npm run verify
+npm run verify                    # tsc + vitest + build + playwright
 ```
+
+The end-to-end suite brings its own small made-up deck
+(`tests/fixtures/deck.json`) and imports it through the app's own parser, so a
+broken import turns the whole suite red. It never touches the network: Wikimedia
+is stubbed, because a test that quietly tests something different depending on
+where it runs is worse than no test.
 
 ## Structure
 
 `scripts/build.mjs` turns everything in `src/` into the files the page loads,
-written to `dist/`. It runs as part of `npm run dev`, `npm test`, and
+written to `dist/`. It runs as part of `npm run dev`, `npm test` and
 `npm run build`; `dist/` is never committed.
 
 | Edit | Generated into `dist/` |
 | --- | --- |
 | `src/index.html`, `src/learn.css`, `src/icon.svg`, `src/app.webmanifest` | copied as-is |
-| `src/learn.core.js`, `src/wrongbook-addon.js`, `src/mastered-addon.js` | `learn.js` |
+| `src/learn.core.js`, `src/wrongbook-addon.js`, `src/mastered-addon.js`, `src/drills-addon.js`, `src/md5.js` | `learn.js` |
 | `src/store.js` | `store.js` |
+| `src/deck.js` | `deck.js` |
 | `src/sw.source.js` | `sw.js` |
-| `src/drills-addon.js` | folded into `learn.js` |
-| `src/data/cards-mini-*.txt` | `cards.json` |
-| `src/data/zh-*.json` | `zh.json` |
 
-`src/store.js` owns every read and write to `localStorage`, including the one-time
-migration of progress saved under the pre-2026 id scheme. Writes are batched, so
-anything that reads its own state back must keep an in-memory copy and merge into
-that — re-reading storage inside a flush window sees a stale value and silently
-drops the pending change.
+`src/store.js` owns every read and write to `localStorage`, including the
+one-time migration of progress saved under the pre-2026 id scheme. Writes are
+batched, so anything that reads its own state back must keep an in-memory copy
+and merge into that — re-reading storage inside a flush window sees a stale value
+and silently drops the pending change.
 
-## Rules that keep saved progress intact
+`src/deck.js` owns the word list: parsing, the card ids, and IndexedDB. It
+implements SHA-256 by hand rather than calling `crypto.subtle`, which is
+unavailable outside a secure context and asynchronous on top; one code path that
+always produces the same digits matters more here than native speed, because
+those digits are how your progress finds its words.
 
-Everything a learner accumulates is keyed by card id, so these are not style
-preferences — breaking either one silently destroys data already sitting in
-people's browsers.
+The service worker's cache name is derived from the content it caches, so a
+deploy can never leave a returning visitor pinned to stale JavaScript.
 
-- **Card ids are derived from the word, never from its position in the file.**
-  Ids were once `${level}-${chapter}-${lineNumber}`; inserting a single word
-  renumbered 99.8% of the deck and orphaned every saved record. `tests/data.test.ts`
-  enforces the current scheme and that it survives an insertion.
-- **The Chinese gloss files are positional arrays** resolved against the deck at
-  build time. Adding or removing an A1/A2 word without updating the matching
-  `src/data/zh-*.json` fails the build, and the error names the file to fix. This
-  is deliberate: the mapping used to happen at runtime, where an off-by-one would
-  silently mislabel every remaining word instead of failing.
+## Licence
 
-**Plural forms are derived, not stored.** The Glossar writes them compactly — a
-leading `"` or `*` marks an umlaut of the last stem vowel, `-` stands for the
-singular, and the rest is the suffix, so `die Stadt "e` becomes `die Städte`.
-A word with no marker, or an ambiguous one, produces no question rather than a
-guess: a wrong plural would actively teach an error. `tests/data.test.ts` checks
-the derivation against a list of known forms, umlauts included, and against nouns
-like `das Wort` that have two correct plurals with different senses.
-
-Pronunciation prefers a recorded native speaker over synthesis. Roughly 92% of
-this deck has one on Wikimedia Commons (A1 97%, A2 94%, B1 84%, measured against
-the live service). Commons stores an upload at `commons/<h0>/<h0h1>/<name>` where
-`h` is the MD5 of the file name, so `src/md5.js` computes the address directly —
-one request per word, the audio itself, with no lookup first. The MP3 transcode is
-used rather than the original Ogg, which Safari does not play. Recordings are
-CC-licensed; the app names the source. A word with no recording falls back to
-synthesis and is not requested again for 30 days, a slow network gives up after
-2.5 seconds rather than leaving the button silent, and fetched audio is cached so
-it replays offline — the service worker's purge exempts that cache, or every
-deploy would throw the downloads away.
-
-`tests/data.test.ts` pins the MD5 against published vectors and against real
-Commons paths including an umlaut, since a wrong hash means every pronunciation
-404s and CI cannot reach the service to notice.
-
-Synthesis, the fallback, uses an explicitly chosen voice. Setting
-only the language left the browser on its default German voice — the old compact
-one on Apple devices — while better voices were usually installed and simply not
-asked for. Voices are ranked (premium, enhanced/neural, Google's network voice,
-then anything), the best is used by default, and the learner can override it. A
-static site cannot do better than this: cloud text-to-speech needs an API key,
-which a client-side app cannot keep secret, and recorded audio for 5452 words is
-neither licensable nor small.
-
-The service worker's cache name is a hash of the files it caches, so any deploy
-that changes an asset invalidates it automatically. Nothing is version-bumped by
-hand — a stale cache name used to pin returning visitors to old JavaScript.
-
-## Deployment
-
-`.github/workflows/deploy.yml` runs the full gate on every pull request against
-`main` and on every push to `main`. Only a push to `main` goes on to deploy
-through GitHub Pages. Set the repository's Pages source to **GitHub Actions**.
-
-The published path must stay `/deutsch-woerter/`: learners' progress is scoped to
-that origin, and the installed PWA points at it.
+[MIT](LICENSE). The code only — any word list you import is yours and stays
+yours.

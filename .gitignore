@@ -3,3 +3,9 @@ dist/
 playwright-report/
 test-results/
 .DS_Store
+
+# Vocabulary belongs to whoever made it, not to this repository. Keep personal
+# word lists and progress backups out of git.
+src/data/
+*.deck.json
+netzwerk_vocab_*backup*.json

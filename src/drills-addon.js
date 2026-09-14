@@ -19,7 +19,7 @@ const LdrillArticle = c => (c.de.match(/^(der|die|das)\b/i) || [])[1]?.toLowerCa
 const LdrillStem = c => c.de.replace(/^(der|die|das)\s+/i, "").trim();
 const LdrillNouns = () => CARDS.filter(c => LdrillArticle(c) && !Lmastered(Lstate(c)));
 
-// The Glossar writes plurals compactly: a leading " or * marks an umlaut, an
+// Word lists write plurals compactly: a leading " or * marks an umlaut, an
 // optional - stands for the singular stem, and the rest is the suffix. A few
 // entries carry mojibake (a € where an e belongs) that means the same thing.
 function LumlautStem(stem) {
@@ -53,7 +53,7 @@ function LpluralOf(c) {
 }
 const LdrillPluralNouns = () => LdrillNouns().filter(c => LpluralOf(c));
 // Dictation needs a word a synthesiser can actually pronounce as one unit —
-// multi-word or slashed Glossar entries read as gibberish.
+// multi-word or slashed entries read as gibberish.
 const LdictationCards = () => CARDS.filter(c => !Lmastered(Lstate(c)) && /^(?:(?:der|die|das)\s+)?[A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß-]{2,}$/.test(c.de.trim()));
 function LpluralAlts(c) {
   const want = LpluralOf(c);
@@ -115,9 +115,9 @@ function LrenderDrillHome() {
 <div class="coverage">${genderOn
     ? `<b>性别专项 · 可练 ${pool.length} 个名词。</b> 拼写检查默认不强制冠词，所以性别几乎没被单独考过。已掌握的词不会出现。`
     : pluralOn
-    ? `<b>复数专项 · 可练 ${pool.length} 个名词。</b> 复数形式由 Glossar 的词形记号推导（<code>"</code> 表示变音），无法确定的词不会出题。`
+    ? `<b>复数专项 · 可练 ${pool.length} 个名词。</b> 复数形式由词库的词形记号推导（<code>"</code> 表示变音），无法确定的词不会出题。`
     : `<b>听写 · 可练 ${pool.length} 个词。</b> 听德语写出来，先不给中文。${LhasGermanVoice() ? "" : "<br><b>注意：这台设备没有德语语音</b>，朗读会带口音甚至读错，建议先在系统里装一个德语语音。"}`}</div>
-<label style="margin:12px 0 4px">级别<select id="drillLevel"><option value="ALL">全部 A1–B1</option><option value="A1">A1</option><option value="A2">A2</option><option value="B1">B1</option></select></label>
+<label style="margin:12px 0 4px">级别<select id="drillLevel">${LlevelChoices()}</select></label>
 <div class="drillBreak">${genderOn ? perArticle : `<div class="drillRow"><span>${pluralOn ? "复数" : "听写"}练习准确率</span><span>${(() => { const s = LdrillAccuracy(drillKind); return s.n ? `${s.pct}% （${s.ok}/${s.n}）` : "还没练过" })()}</span></div>`}</div>
 <div class="wrongActions" style="margin-top:14px"><button class="primary" id="drillStart" ${pool.length ? "" : "disabled"}>开始 20 题</button></div>`;
   L$("drillLevel").value = drillLevel;

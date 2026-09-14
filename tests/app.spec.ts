@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 
 // Regression cover for the vocabulary PWA's data-durability behaviour. Each test
 // here maps to a way progress used to be lost or an answer used to be scored wrong.
@@ -10,13 +11,15 @@ const LEARN_KEY = 'netzwerk_vocab_learning_v1';
 const WRONG_KEY = 'netzwerk_vocab_spelling_wrongbook_v1';
 const SCHEMA_KEY = 'netzwerk_vocab_schema';
 
-// The page keeps its deck in a `let` binding, which is deliberately not a window
-// property. Read the same static file it reads instead of reaching into its scope.
+// The app ships with no vocabulary of its own, so every test brings its own deck.
+// It is a small, made-up word list rather than a copy of anyone's textbook, and
+// it is deliberately shaped like a real one: three chapters, two levels, nouns of
+// all three genders, two words sharing a meaning, and one word listed twice.
+const FIXTURE = readFileSync(new URL('./fixtures/deck.json', import.meta.url), 'utf8');
+
 const deck = async (page: Page): Promise<Array<{ id: string; level: string; chapter: string; de: string }>> =>
-  page.evaluate(async () => {
-    const rows = await (await fetch('./cards.json')).json();
-    return rows.map((r: string[]) => ({ id: r[0], level: r[1], chapter: r[2], de: r[3] }));
-  });
+  page.evaluate(() =>
+    (window as any).__deck.cards.map((c: any) => ({ id: c.id, level: c.level, chapter: String(c.chapter), de: c.de })));
 
 test.beforeEach(async ({ page }) => {
   await page.route('**://*.wikimedia.org/**', (route) => route.abort('failed'));
@@ -27,19 +30,36 @@ const ready = async (page: Page) => {
   await expect(page.locator('#learnStartBtn')).toHaveText('开始学新词', { timeout: 20000 });
 };
 
+// Loading the app for the first time lands on the import gate. Seeding through
+// the app's own parser and store (rather than writing IndexedDB by hand) keeps
+// the fixture honest: if import breaks, every test here goes red.
+const seedDeck = async (page: Page) => {
+  await page.evaluate(async (raw) => {
+    const d = (window as any).DWDeck;
+    await d.save(d.parse(raw, 'fixture.json'));
+  }, FIXTURE);
+};
+
+const open = async (page: Page) => {
+  await page.goto(APP);
+  if (await page.locator('#deckGate').isVisible()) {
+    await seedDeck(page);
+    await page.reload();
+  }
+  await ready(page);
+};
+
 test('loads cleanly with both modes available', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   await expect(page.locator('#learnMasteredBtn')).toHaveCount(1);
   await expect(page.locator('#learnWrongBtn')).toHaveCount(1);
   expect(errors).toEqual([]);
 });
 
 test('migrates progress saved under the old line-number ids', async ({ page }) => {
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   await page.evaluate(([quizKey, learnKey, schemaKey]) => {
     const quiz: Record<string, unknown> = {};
     const learn: Record<string, unknown> = {};
@@ -79,8 +99,7 @@ for (const key of [QUIZ_KEY, LEARN_KEY, WRONG_KEY]) {
   test(`survives a corrupted ${key.replace('netzwerk_vocab_', '')} value`, async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (e) => errors.push(e.message));
-    await page.goto(APP);
-    await ready(page);
+    await open(page);
     await page.evaluate((k) => localStorage.setItem(k, '{"A1-1-1":'), key);
     await page.reload();
     // A corrupted value used to throw at module scope and delete a whole mode
@@ -93,8 +112,7 @@ for (const key of [QUIZ_KEY, LEARN_KEY, WRONG_KEY]) {
 }
 
 test('importing a backup merges instead of replacing', async ({ page }) => {
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   const cards = await deck(page);
   const [a, b, c] = [cards[0].id, cards[1].id, cards[9].id];
   await page.evaluate(([quizKey, schemaKey, a, b]) => {
@@ -136,8 +154,7 @@ test('importing a backup merges instead of replacing', async ({ page }) => {
 });
 
 test('scores German-to-English answers on whole meanings, not substrings', async ({ page }) => {
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   const verdicts = await page.evaluate(() => {
     (document.getElementById('direction') as HTMLSelectElement).value = 'de-en';
     const check = (en: string, input: string) =>
@@ -162,8 +179,7 @@ test('scores German-to-English answers on whole meanings, not substrings', async
 });
 
 test('a missed word comes back this session instead of in two weeks', async ({ page }) => {
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   const a1k1 = (await deck(page)).filter((c) => c.level === 'A1' && String(c.chapter) === '1').map((c) => c.id);
   await page.evaluate(([learnKey, schemaKey, ids]) => {
     const learn: Record<string, unknown> = {};
@@ -211,8 +227,7 @@ test('a missed word comes back this session instead of in two weeks', async ({ p
 });
 
 test('never renders the correct answer twice in one multiple-choice question', async ({ page }) => {
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   // A1 Kapitel 1 contains several words that share a meaning ("Deutsch"/"Deutsch",
   // "das Würstchen"/"das Würstchen", five words glossed "the"), which used to
   // produce two identical options with only one counted correct.
@@ -252,8 +267,7 @@ test('never renders the correct answer twice in one multiple-choice question', a
 });
 
 test('?mastered=1 opens the mastered archive', async ({ page }) => {
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   const firstId = (await deck(page))[0].id;
   await page.evaluate(([learnKey, schemaKey, id]) => {
     localStorage.setItem(learnKey, JSON.stringify({
@@ -267,8 +281,7 @@ test('?mastered=1 opens the mastered archive', async ({ page }) => {
 });
 
 test('batches writes instead of re-serialising the whole store per answer', async ({ page }) => {
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   const card = (await deck(page))[10];
   const result = await page.evaluate((card) => {
     const save = (window as any).save;
@@ -287,8 +300,7 @@ test('batches writes instead of re-serialising the whole store per answer', asyn
 });
 
 test('today card clears due words across chapters in one session', async ({ page }) => {
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   // Due words spread over three different Kapitel. Review used to be locked to
   // whichever chapter the picker showed, so this needed three separate sessions.
   const cards = await deck(page);
@@ -319,8 +331,7 @@ test('today card clears due words across chapters in one session', async ({ page
 });
 
 test('gender drill asks for der/die/das and scores per article', async ({ page }) => {
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   await page.locator('#goLearn').click();
   await page.locator('#learnDrillBtn').click();
   await expect(page.locator('#drillOverlay')).toBeVisible();
@@ -344,8 +355,7 @@ test('gender drill asks for der/die/das and scores per article', async ({ page }
 });
 
 test('plural drill accepts every attested plural of the same noun', async ({ page }) => {
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   await page.locator('#goLearn').click();
   await page.locator('#learnDrillBtn').click();
   await page.locator('#tabPlural').click();
@@ -362,8 +372,7 @@ test('plural drill accepts every attested plural of the same noun', async ({ pag
 });
 
 test('wrong-book explains what kind of mistake was made', async ({ page }) => {
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   const cards = await deck(page);
   const noun = cards.find((c) => /^die\s/.test(c.de))!;
   await page.evaluate(([wrongKey, schemaKey, noun]) => {
@@ -403,8 +412,7 @@ test('dictation asks by ear and does not leak the word', async ({ page }) => {
     });
     (window as any).SpeechSynthesisUtterance = class { text: string; lang = ''; rate = 1; constructor(t: string) { this.text = t } };
   });
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   await page.locator('#goLearn').click();
   await page.locator('#learnDrillBtn').click();
   await page.locator('#tabDictation').click();
@@ -441,8 +449,7 @@ test('the revealed answer can be played back in every mode', async ({ page }) =>
     });
     (window as any).SpeechSynthesisUtterance = class { text: string; lang = ''; rate = 1; constructor(t: string) { this.text = t } };
   });
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
 
   // quiz: answer one question and play the answer back
   await page.locator('#goQuiz').click();
@@ -467,8 +474,7 @@ test('the revealed answer can be played back in every mode', async ({ page }) =>
 });
 
 test('remembers the level and Kapitel across reloads', async ({ page }) => {
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   await page.locator('#goLearn').click();
   await page.selectOption('#learnLevel', 'A2');
   await page.selectOption('#learnChapter', '5');
@@ -484,8 +490,7 @@ test('remembers the level and Kapitel across reloads', async ({ page }) => {
 });
 
 test('spelling can be switched off without stalling review pacing', async ({ page }) => {
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   await page.locator('#goLearn').click();
   await page.selectOption('#learnLevel', 'A1');
   await page.selectOption('#learnChapter', '1');
@@ -494,14 +499,10 @@ test('spelling can be switched off without stalling review pacing', async ({ pag
   await expect(page.locator('#learnSpellNote')).toContainText('不会进入「已掌握」');
   await page.locator('#learnStartBtn').click();
 
-  const lookup = await page.evaluate(async () => {
-    const [rows, zh] = await Promise.all([
-      (await fetch('./cards.json')).json(),
-      (await fetch('./zh.json')).json(),
-    ]);
+  const lookup = await page.evaluate(() => {
     const clean = (s: string) => (s || '').replace(/^[_\-–—\s]+/, '').replace(/\s*\([^)]*\)\s*$/, ' ').trim();
     const byId: Record<string, { de: string; meaning: string }> = {};
-    for (const r of rows) byId[r[0]] = { de: r[3], meaning: zh[r[0]] || clean(r[4]) };
+    for (const c of (window as any).__deck.cards) byId[c.id] = { de: c.de, meaning: c.zh || clean(c.en) };
     return byId;
   });
   const answerCorrectly = async () => {
@@ -551,8 +552,7 @@ test('spelling can be switched off without stalling review pacing', async ({ pag
 });
 
 test('a word cannot reach mastered while spelling is off', async ({ page }) => {
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   const cards = await deck(page);
   const target = cards.find((c) => c.level === 'A1' && String(c.chapter) === '1')!;
   // three completed cycles and full strength — everything except having spelled it
@@ -571,8 +571,7 @@ test('a word cannot reach mastered while spelling is off', async ({ page }) => {
 
 
 test('the spelling toggle reaches review and the daily session too', async ({ page }) => {
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   const cards = await deck(page);
   const due = cards.filter((c) => c.level === 'A1' && String(c.chapter) === '1').slice(0, 8).map((c) => c.id);
   const seed = async (spelling: boolean) => {
@@ -636,8 +635,7 @@ test('the spelling toggle reaches review and the daily session too', async ({ pa
 });
 
 test('the two spelling toggles stay in sync', async ({ page }) => {
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   await expect(page.locator('#homeSpellToggle')).toBeChecked();
   await page.locator('#homeSpellToggle').uncheck();
   await page.locator('#goLearn').click();
@@ -674,8 +672,7 @@ test('speech picks the best German voice the device has', async ({ page }) => {
     });
     (window as any).SpeechSynthesisUtterance = class { text: string; lang = ''; rate = 1; voice: unknown = null; constructor(t: string) { this.text = t } };
   });
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   await page.locator('#goLearn').click();
 
   // English is excluded; the premium German voice wins
@@ -718,8 +715,7 @@ test('says how to get a better voice when only basic ones exist', async ({ page 
     });
     (window as any).SpeechSynthesisUtterance = class { text: string; lang = ''; rate = 1; voice: unknown = null; constructor(t: string) { this.text = t } };
   });
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   await page.locator('#goLearn').click();
   await expect(page.locator('#voiceHint')).toContainText('基础音质');
   await expect(page.locator('#voiceHint')).toContainText(/设置|系统设置|Chrome/);
@@ -733,16 +729,14 @@ test('handles a device with no German voice at all', async ({ page }) => {
     });
     (window as any).SpeechSynthesisUtterance = class { text: string; lang = ''; rate = 1; voice: unknown = null; constructor(t: string) { this.text = t } };
   });
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   await page.locator('#goLearn').click();
   await expect(page.locator('#voicePick')).toBeDisabled();
   await expect(page.locator('#voiceHint')).toContainText('没有德语语音');
 });
 
 test('round size offers larger sets and remembers the choice', async ({ page }) => {
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   await page.locator('#goLearn').click();
   expect(await page.locator('#learnCount option').allTextContents())
     .toEqual(['5', '10', '15', '20', '30', '50']);
@@ -778,8 +772,7 @@ test('Android is told to install the German voice data, not just switch browser'
     });
     (window as any).SpeechSynthesisUtterance = class { text: string; lang = ''; rate = 1; voice: unknown = null; constructor(t: string) { this.text = t } };
   });
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   await page.locator('#goLearn').click();
   const hint = page.locator('#voiceHint');
   await expect(hint).toContainText('文字转语音');
@@ -824,8 +817,7 @@ const stubAudio = async (page: Page, opts: { status?: number } = {}) => {
 
 test('plays the recorded pronunciation and caches it', async ({ page }) => {
   const requests = await stubAudio(page);
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   await page.locator('#goLearn').click();
   await page.locator('#voiceTest').click();   // speaks "Haus"
 
@@ -845,8 +837,7 @@ test('plays the recorded pronunciation and caches it', async ({ page }) => {
 
 test('falls back to synthesis when a word has no recording, and stops retrying it', async ({ page }) => {
   const requests = await stubAudio(page, { status: 404 });
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   await page.locator('#goLearn').click();
   await page.locator('#voiceTest').click();
 
@@ -862,8 +853,7 @@ test('falls back to synthesis when a word has no recording, and stops retrying i
 
 test('recorded audio can be turned off', async ({ page }) => {
   const requests = await stubAudio(page);
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   await page.locator('#goLearn').click();
   await expect(page.locator('#recordedToggle')).toBeChecked();
   await expect(page.locator('#recordedNote')).toContainText('Wikimedia Commons');
@@ -878,9 +868,84 @@ test('recorded audio can be turned off', async ({ page }) => {
 test('a network failure still produces sound', async ({ page }) => {
   await stubAudio(page);
   await page.route('**upload.wikimedia.org/**', (route) => route.abort('failed'));
-  await page.goto(APP);
-  await ready(page);
+  await open(page);
   await page.locator('#goLearn').click();
   await page.locator('#voiceTest').click();
   await expect.poll(() => page.evaluate(() => (window as any).__spoken)).toEqual(['Haus']);
+});
+
+test('the first visit asks for a word list and keeps it afterwards', async ({ page }) => {
+  await page.goto(APP);
+  // Nothing is bundled with the app, so a fresh browser has no vocabulary at all.
+  await expect(page.locator('#deckGate')).toBeVisible();
+  await expect(page.locator('#app')).toBeHidden();
+
+  await page.locator('#deckFile').setInputFiles({
+    name: 'meine-woerter.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('de,zh,en,level,chapter\ndas Haus,房子,house,A1,1\ndie Tür,门,door,A1,1\n', 'utf8'),
+  });
+  await ready(page);
+  await expect(page.locator('#deckInfo')).toContainText('2 个词条');
+  await expect(page.locator('#bankInfo')).toContainText('A1 2');
+
+  // and it is still there on the next visit, offline included
+  await page.reload();
+  await ready(page);
+  await expect(page.locator('#deckGate')).toBeHidden();
+  await expect(page.locator('#deckInfo')).toContainText('meine-woerter');
+});
+
+test('a deck the browser builds gets the same ids the old build shipped', async ({ page }) => {
+  // The ids are the keys every progress record is filed under. If the browser
+  // computed them differently from the build that produced the deployed site,
+  // everyone's history would silently detach on the next visit.
+  await open(page);
+  const byWord = new Map((await deck(page)).map((c) => [`${c.level}|${c.chapter}|${c.de}`, c.id]));
+  expect(byWord.get('A1|1|das Haus')).toBe('745f7f512f');
+  expect(byWord.get('A1|1|die Tür')).toBe('c04e6fe0dd');
+  expect(byWord.get('A2|5|der Bahnhof')).toBe('14b3aaa187');
+});
+
+test('swapping the deck keeps the progress of words both decks share', async ({ page }) => {
+  await open(page);
+  const cards = await deck(page);
+  const haus = cards.find((c) => c.de === 'das Haus')!;
+  await page.evaluate(([learnKey, schemaKey, id]) => {
+    localStorage.setItem(learnKey, JSON.stringify({
+      [id]: { introduced: true, strength: 5, cycles: 3, spellingPass: true, known: true, wrong: 0, last: 1, due: 1 },
+    }));
+    localStorage.setItem(schemaKey, '2');
+  }, [LEARN_KEY, SCHEMA_KEY, haus.id] as const);
+  await page.reload();
+  await ready(page);
+  await expect(page.locator('#homeMastered')).toHaveText('1');
+
+  page.on('dialog', (d) => d.accept());
+  await page.locator('#deckFile').setInputFiles({
+    name: 'anderer-wortschatz.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('de,zh,level,chapter\ndas Haus,房子,A1,1\ndas Boot,船,A1,1\n', 'utf8'),
+  });
+  await ready(page);
+
+  await expect(page.locator('#deckInfo')).toContainText('2 个词条');
+  // same word, same id, so the mastered record it already had is still its own
+  await expect(page.locator('#homeMastered')).toHaveText('1');
+  expect((await deck(page)).find((c) => c.de === 'das Haus')!.id).toBe(haus.id);
+});
+
+test('an unreadable file is refused with a reason, leaving the deck alone', async ({ page }) => {
+  await open(page);
+  const before = (await deck(page)).length;
+  const dialogs: string[] = [];
+  page.on('dialog', (d) => { dialogs.push(d.message()); d.accept(); });
+  await page.locator('#deckFile').setInputFiles({
+    name: 'nonsense.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('alpha,beta\n1,2\n', 'utf8'),
+  });
+  await expect.poll(() => dialogs.length).toBeGreaterThan(0);
+  expect(dialogs.join('\n')).toMatch(/de/);
+  expect((await deck(page)).length).toBe(before);
 });
