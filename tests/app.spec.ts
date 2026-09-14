@@ -730,3 +730,52 @@ test('handles a device with no German voice at all', async ({ page }) => {
   await expect(page.locator('#voicePick')).toBeDisabled();
   await expect(page.locator('#voiceHint')).toContainText('没有德语语音');
 });
+
+test('round size offers larger sets and remembers the choice', async ({ page }) => {
+  await page.goto(APP);
+  await ready(page);
+  await page.locator('#goLearn').click();
+  expect(await page.locator('#learnCount option').allTextContents())
+    .toEqual(['5', '10', '15', '20', '30', '50']);
+  await expect(page.locator('#learnCount')).toHaveValue('10');
+
+  await page.selectOption('#learnCount', '30');
+  await page.evaluate(() => (window as any).DWStore.flush());
+  await page.reload();
+  await ready(page);
+  await page.locator('#goLearn').click();
+  await expect(page.locator('#learnCount')).toHaveValue('30');
+
+  // the size actually drives the session
+  await page.selectOption('#learnCount', '20');
+  await page.locator('#learnStartBtn').click();
+  const total = Number((await page.locator('#learnBadge').textContent())!.match(/\/(\d+)/)![1]);
+  expect(total).toBe(20 * 4); // intro + three stages per word
+});
+
+test('Android is told to install the German voice data, not just switch browser', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'userAgent', {
+      configurable: true,
+      value: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36',
+    });
+    Object.defineProperty(window, 'speechSynthesis', {
+      configurable: true,
+      value: {
+        cancel() {}, addEventListener() {}, speak() {},
+        // Android voices advertise nothing about their quality either way
+        getVoices: () => [{ name: 'Deutsch (Deutschland)', lang: 'de-DE', voiceURI: 'de-de', localService: true }],
+      },
+    });
+    (window as any).SpeechSynthesisUtterance = class { text: string; lang = ''; rate = 1; voice: unknown = null; constructor(t: string) { this.text = t } };
+  });
+  await page.goto(APP);
+  await ready(page);
+  await page.locator('#goLearn').click();
+  const hint = page.locator('#voiceHint');
+  await expect(hint).toContainText('文字转语音');
+  await expect(hint).toContainText('Google');
+  // a voice that says nothing about its quality must not be called basic, nor starred
+  await expect(hint).not.toContainText('基础音质');
+  expect(await page.locator('#voicePick option').allTextContents()).toEqual(['Deutsch (Deutschland)']);
+});
