@@ -5,7 +5,7 @@
 const DRILL_KEY = "netzwerk_vocab_grammar_drills_v1";
 let drillProgress = DWStore.read(DRILL_KEY, {});
 DWStore.onMigrated(() => { drillProgress = DWStore.read(DRILL_KEY, {}) });
-let drillKind = "gender", drillLevel = "ALL", drillQueue = [], drillPos = 0, drillScore = 0, drillAnswered = false;
+let drillKind = DWStore.prefs().drill || "gender", drillLevel = DWStore.prefs().drillLevel || "ALL", drillQueue = [], drillPos = 0, drillScore = 0, drillAnswered = false;
 
 const LdrillState = (id, kind) => (drillProgress[id] || {})[kind] || { n: 0, ok: 0, miss: 0 };
 function LdrillSave(id, kind, correct) {
@@ -52,6 +52,9 @@ function LpluralOf(c) {
   return `die ${stem}${suffix}`;
 }
 const LdrillPluralNouns = () => LdrillNouns().filter(c => LpluralOf(c));
+// Dictation needs a word a synthesiser can actually pronounce as one unit —
+// multi-word or slashed Glossar entries read as gibberish.
+const LdictationCards = () => CARDS.filter(c => !Lmastered(Lstate(c)) && /^(?:(?:der|die|das)\s+)?[A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß-]{2,}$/.test(c.de.trim()));
 function LpluralAlts(c) {
   const want = LpluralOf(c);
   const alts = new Set(want ? [want] : []);
@@ -60,7 +63,7 @@ function LpluralAlts(c) {
 }
 
 function LdrillPool() {
-  const base = drillKind === "plural" ? LdrillPluralNouns() : LdrillNouns();
+  const base = drillKind === "plural" ? LdrillPluralNouns() : drillKind === "dictation" ? LdictationCards() : LdrillNouns();
   return drillLevel === "ALL" ? base : base.filter(c => c.level === drillLevel);
 }
 // Unseen first, then whatever is currently being missed.
@@ -80,7 +83,7 @@ function LbuildDrillUI() {
   const ov = document.createElement("div");
   ov.id = "drillOverlay";
   ov.className = "drillOverlay hidden";
-  ov.innerHTML = `<div class="drillSheet"><div class="drillHead"><h2>🎲 语法专项</h2><button class="secondary" id="drillClose">关闭</button></div><div id="drillContent"></div></div>`;
+  ov.innerHTML = `<div class="drillSheet"><div class="drillHead"><h2>🎲 专项训练</h2><button class="secondary" id="drillClose">关闭</button></div><div id="drillContent"></div></div>`;
   document.body.appendChild(ov);
   L$("drillClose").onclick = LcloseDrill;
   ov.addEventListener("click", e => { if (e.target === ov) LcloseDrill() });
@@ -99,7 +102,7 @@ function LdrillAccuracy(kind, filter) {
 }
 function LrenderDrillHome() {
   const box = L$("drillContent"), pool = LdrillPool();
-  const genderOn = drillKind === "gender";
+  const genderOn = drillKind === "gender", pluralOn = drillKind === "plural", dictOn = drillKind === "dictation";
   // Guessing "die" alone scores about 45%, so a single overall figure flatters
   // the learner. Accuracy is broken out per article instead.
   const perArticle = ["der", "die", "das"].map(a => {
@@ -108,17 +111,20 @@ function LrenderDrillHome() {
     return `<div class="drillRow"><span><b>${a}</b> · 词库 ${total}</span><span>${s.n ? `${s.pct}% （${s.ok}/${s.n}）` : "还没练过"}</span></div>`;
   }).join("");
   const plural = LdrillAccuracy("plural");
-  box.innerHTML = `<div class="drillTabs"><button class="secondary ${genderOn ? "on" : ""}" id="tabGender">der / die / das</button><button class="secondary ${genderOn ? "" : "on"}" id="tabPlural">复数形式</button></div>
+  box.innerHTML = `<div class="drillTabs"><button class="secondary ${genderOn ? "on" : ""}" id="tabGender">der / die / das</button><button class="secondary ${pluralOn ? "on" : ""}" id="tabPlural">复数形式</button><button class="secondary ${dictOn ? "on" : ""}" id="tabDictation">听写</button></div>
 <div class="coverage">${genderOn
     ? `<b>性别专项 · 可练 ${pool.length} 个名词。</b> 拼写检查默认不强制冠词，所以性别几乎没被单独考过。已掌握的词不会出现。`
-    : `<b>复数专项 · 可练 ${pool.length} 个名词。</b> 复数形式由 Glossar 的词形记号推导（<code>"</code> 表示变音），无法确定的词不会出题。`}</div>
+    : pluralOn
+    ? `<b>复数专项 · 可练 ${pool.length} 个名词。</b> 复数形式由 Glossar 的词形记号推导（<code>"</code> 表示变音），无法确定的词不会出题。`
+    : `<b>听写 · 可练 ${pool.length} 个词。</b> 听德语写出来，先不给中文。${LhasGermanVoice() ? "" : "<br><b>注意：这台设备没有德语语音</b>，朗读会带口音甚至读错，建议先在系统里装一个德语语音。"}`}</div>
 <label style="margin:12px 0 4px">级别<select id="drillLevel"><option value="ALL">全部 A1–B1</option><option value="A1">A1</option><option value="A2">A2</option><option value="B1">B1</option></select></label>
-<div class="drillBreak">${genderOn ? perArticle : `<div class="drillRow"><span>复数练习准确率</span><span>${plural.n ? `${plural.pct}% （${plural.ok}/${plural.n}）` : "还没练过"}</span></div>`}</div>
+<div class="drillBreak">${genderOn ? perArticle : `<div class="drillRow"><span>${pluralOn ? "复数" : "听写"}练习准确率</span><span>${(() => { const s = LdrillAccuracy(drillKind); return s.n ? `${s.pct}% （${s.ok}/${s.n}）` : "还没练过" })()}</span></div>`}</div>
 <div class="wrongActions" style="margin-top:14px"><button class="primary" id="drillStart" ${pool.length ? "" : "disabled"}>开始 20 题</button></div>`;
   L$("drillLevel").value = drillLevel;
-  L$("drillLevel").onchange = e => { drillLevel = e.target.value; LrenderDrillHome() };
-  L$("tabGender").onclick = () => { drillKind = "gender"; LrenderDrillHome() };
-  L$("tabPlural").onclick = () => { drillKind = "plural"; LrenderDrillHome() };
+  L$("drillLevel").onchange = e => { drillLevel = e.target.value; DWStore.prefs({ drillLevel }); LrenderDrillHome() };
+  L$("tabGender").onclick = () => { drillKind = "gender"; DWStore.prefs({ drill: drillKind }); LrenderDrillHome() };
+  L$("tabPlural").onclick = () => { drillKind = "plural"; DWStore.prefs({ drill: drillKind }); LrenderDrillHome() };
+  L$("tabDictation").onclick = () => { drillKind = "dictation"; DWStore.prefs({ drill: drillKind }); LrenderDrillHome() };
   L$("drillStart").onclick = LstartDrill;
 }
 function LstartDrill() { drillQueue = LdrillPick(20); drillPos = 0; drillScore = 0; drillAnswered = false; LrenderDrill() }
@@ -135,7 +141,15 @@ function LrenderDrill() {
   drillAnswered = false;
   const c = drillQueue[drillPos];
   const head = `<div class="wrongMini">${drillPos + 1} / ${drillQueue.length} · ${Lesc(c.level)} Kapitel ${Lesc(String(c.chapter))}</div>`;
-  if (drillKind === "gender") {
+  if (drillKind === "dictation") {
+    box.innerHTML = `${head}<div class="drillWord">🔊</div><div class="drillHint">听德语，写出这个词</div><div class="wrongActions" style="justify-content:center"><button class="primary" id="drillPlay">再听一遍</button></div><div class="wrongPracticeBox"><input id="drillAnswer" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="done" placeholder="写下你听到的…">${LcharBar("drillAnswer")}<div class="wrongActions"><button class="primary" id="drillCheck">检查</button><button class="secondary" id="drillShow">听不出</button></div></div><div id="drillFeedback"></div>`;
+    const input = L$("drillAnswer");
+    L$("drillPlay").onclick = () => Lspeak(c.de);
+    L$("drillCheck").onclick = () => LanswerDictation(c, false);
+    L$("drillShow").onclick = () => LanswerDictation(c, true);
+    input.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); LanswerDictation(c, false) } });
+    setTimeout(() => { Lspeak(c.de); input.focus() }, 120);
+  } else if (drillKind === "gender") {
     box.innerHTML = `${head}<div class="drillWord">${Lesc(LdrillStem(c))}</div><div class="drillHint">${Lesc(LhasZh(c) ? Lmeaning(c) : Lenglish(c))}</div><div class="genderGrid">${["der", "die", "das"].map(a => `<button class="secondary" data-a="${a}">${a}</button>`).join("")}</div><div id="drillFeedback"></div>`;
     document.querySelectorAll("#drillContent .genderGrid button").forEach(b => b.onclick = () => LanswerGender(c, b.dataset.a));
   } else {
@@ -166,7 +180,19 @@ function LanswerGender(c, picked) {
     else if (b.dataset.a === picked) b.classList.add("wrong");
   });
   const pl = LpluralOf(c);
-  LdrillNext(ok, `<div class="deAnswer">${Lesc(c.de)}</div>${pl ? `<div class="meta">复数：${Lesc(pl)}</div>` : ""}`);
+  LdrillNext(ok, `<div class="answerRow"><div class="deAnswer">${Lesc(c.de)}</div>${LspeakBtn(c.de)}</div>${pl ? `<div class="meta">复数：${Lesc(pl)} ${LspeakBtn(pl)}</div>` : ""}`);
+}
+function LanswerDictation(c, show) {
+  if (drillAnswered) return;
+  const input = L$("drillAnswer"), v = input.value.trim();
+  if (!show && !v) return;
+  drillAnswered = true;
+  // Reuse the learning mode's spelling rule so the article stays optional here too.
+  const ok = !show && LspellAccepted(c, v);
+  if (ok) drillScore++;
+  LdrillSave(c.id, "dictation", ok);
+  input.disabled = L$("drillCheck").disabled = L$("drillShow").disabled = true;
+  LdrillNext(ok, `<div class="answerRow"><div class="deAnswer">${Lesc(c.de)}</div>${LspeakBtn(c.de)}</div><div class="meta">${Lesc(LhasZh(c) ? Lmeaning(c) : Lenglish(c))}</div>${!ok && !show && v ? `<div class="wrongInput">你写的是：${Lesc(v)}</div>` : ""}`);
 }
 function LanswerPlural(c, show) {
   if (drillAnswered) return;
@@ -179,7 +205,7 @@ function LanswerPlural(c, show) {
   if (ok) drillScore++;
   LdrillSave(c.id, "plural", ok);
   input.disabled = L$("drillCheck").disabled = L$("drillShow").disabled = true;
-  LdrillNext(ok, `<div class="deAnswer">${Lesc(want)}</div>${alts.length > 1 ? `<div class="meta">也可以是：${alts.filter(a => a !== want).map(Lesc).join(" / ")}</div>` : ""}<div class="meta">单数：${Lesc(c.de)}${c.grammar ? ` · 词形记号 ${Lesc(c.grammar)}` : ""}</div>${!ok && !show && v ? `<div class="wrongInput">你写的是：${Lesc(v)}</div>` : ""}`);
+  LdrillNext(ok, `<div class="answerRow"><div class="deAnswer">${Lesc(want)}</div>${LspeakBtn(want)}</div>${alts.length > 1 ? `<div class="meta">也可以是：${alts.filter(a => a !== want).map(Lesc).join(" / ")}</div>` : ""}<div class="meta">单数：${Lesc(c.de)}${c.grammar ? ` · 词形记号 ${Lesc(c.grammar)}` : ""}</div>${!ok && !show && v ? `<div class="wrongInput">你写的是：${Lesc(v)}</div>` : ""}`);
 }
 
 function LinitDrillUI() {
@@ -188,7 +214,7 @@ function LinitDrillUI() {
     const b = document.createElement("button");
     b.id = "learnDrillBtn";
     b.className = "secondary";
-    b.textContent = "🎲 语法专项";
+    b.textContent = "🎲 专项训练";
     anchor.after(b);
     b.onclick = () => LopenDrill();
   }

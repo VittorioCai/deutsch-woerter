@@ -11,12 +11,14 @@
   const WRONG = "netzwerk_vocab_spelling_wrongbook_v1";
   const SCHEMA = "netzwerk_vocab_schema";
   const BACKUP_AT = "netzwerk_vocab_last_backup_at";
+  const PREFS = "netzwerk_vocab_prefs_v1";
   const SCHEMA_VERSION = 2;
   const FLUSH_MS = 1500;
   const BACKUP_REMINDER_DAYS = 14;
 
   const pending = new Map();
   const rehydrators = [];
+  let prefsCache = null;
   let timer = null;
   let degraded = false;
 
@@ -133,6 +135,22 @@
   const api = {
     KEYS: { QUIZ, LEARN, WRONG },
     read, queue, flush, notice,
+
+    // Small UI preferences — the level and Kapitel you had open, the drill tab.
+    // Kept apart from progress so a corrupted prefs blob can never cost a
+    // learner their study history.
+    //
+    // Merged into an in-memory copy, never re-read from storage per call: writes
+    // are batched, so two changes inside one flush window (picking a level and
+    // then a Kapitel) would both start from the same stale value and the first
+    // would be lost.
+    prefs(patch) {
+      if (!prefsCache) prefsCache = read(PREFS, {});
+      if (!patch) return prefsCache;
+      Object.assign(prefsCache, patch);
+      queue(PREFS, () => prefsCache);
+      return prefsCache;
+    },
     onMigrated(fn) { rehydrators.push(fn); },
     get degraded() { return degraded; },
 

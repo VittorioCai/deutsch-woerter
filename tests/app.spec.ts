@@ -383,3 +383,96 @@ test('wrong-book explains what kind of mistake was made', async ({ page }) => {
   await expect(summary).toContainText('冠词错');
   await expect(summary).toContainText('拼写接近');
 });
+
+test('dictation asks by ear and does not leak the word', async ({ page }) => {
+  // Headless Chromium has no speech synthesis, so stub it and record what the
+  // drill asks to be spoken — that is the actual question here.
+  await page.addInitScript(() => {
+    (window as any).__spoken = [];
+    Object.defineProperty(window, 'speechSynthesis', {
+      configurable: true,
+      value: {
+        cancel() {},
+        getVoices: () => [{ lang: 'de-DE', name: 'stub' }],
+        speak: (u: { text: string }) => (window as any).__spoken.push(u.text),
+      },
+    });
+    (window as any).SpeechSynthesisUtterance = class { text: string; lang = ''; rate = 1; constructor(t: string) { this.text = t } };
+  });
+  await page.goto(APP);
+  await ready(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#learnDrillBtn').click();
+  await page.locator('#tabDictation').click();
+  await expect(page.locator('#drillContent')).toContainText('听写');
+  await page.locator('#drillStart').click();
+  await expect(page.locator('#drillAnswer')).toBeVisible();
+
+  // the word is spoken shortly after the input renders, not with it
+  await page.waitForFunction(() => ((window as any).__spoken as string[]).length > 0);
+  const spoken = await page.evaluate(() => (window as any).__spoken as string[]);
+  const word = spoken[spoken.length - 1];
+  // The prompt must not show the word, its meaning, or its English gloss.
+  const shown = await page.locator('#drillContent').innerText();
+  expect(shown).not.toContain(word);
+
+  await page.locator('#drillAnswer').fill(word);
+  await page.locator('#drillCheck').click();
+  await expect(page.locator('#drillFeedback')).toContainText('对了');
+  // the meaning appears only after answering
+  await expect(page.locator('#drillFeedback .meta')).not.toHaveText('');
+});
+
+test('the revealed answer can be played back in every mode', async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as any).__spoken = [];
+    Object.defineProperty(window, 'speechSynthesis', {
+      configurable: true,
+      value: {
+        cancel() {},
+        getVoices: () => [{ lang: 'de-DE', name: 'stub' }],
+        speak: (u: { text: string }) => (window as any).__spoken.push(u.text),
+      },
+    });
+    (window as any).SpeechSynthesisUtterance = class { text: string; lang = ''; rate = 1; constructor(t: string) { this.text = t } };
+  });
+  await page.goto(APP);
+  await ready(page);
+
+  // quiz: answer one question and play the answer back
+  await page.locator('#goQuiz').click();
+  await page.locator('#startBtn').click();
+  await page.locator('#showBtn').click();
+  const quizSpeak = page.locator('#feedback .speakBtn');
+  await expect(quizSpeak).toHaveCount(1);
+  await quizSpeak.click();
+  expect((await page.evaluate(() => (window as any).__spoken as string[])).length).toBe(1);
+
+  // learning mode: same button on the revealed answer
+  await page.locator('#modeBack').click();
+  await page.locator('#goLearn').click();
+  await page.locator('#learnStartBtn').click();
+  // a group is five introductions before the first recognition question
+  for (let i = 0; i < 6 && !(await page.locator('#learnBody .choice').count()); i++) {
+    await page.locator('#learnRemember').click();
+  }
+  await page.locator('#learnBody .choice').first().click();
+  await expect(page.locator('#learnFeedback .speakBtn')).toHaveCount(1);
+});
+
+test('remembers the level and Kapitel across reloads', async ({ page }) => {
+  await page.goto(APP);
+  await ready(page);
+  await page.locator('#goLearn').click();
+  await page.selectOption('#learnLevel', 'A2');
+  await page.selectOption('#learnChapter', '5');
+  await page.evaluate(() => (window as any).DWStore.flush());
+  expect(await page.evaluate(() => localStorage.getItem('netzwerk_vocab_prefs_v1')))
+    .toBe(JSON.stringify({ level: 'A2', chapter: '5' }));
+
+  await page.reload();
+  await ready(page);
+  await page.locator('#goLearn').click();
+  await expect(page.locator('#learnLevel')).toHaveValue('A2');
+  await expect(page.locator('#learnChapter')).toHaveValue('5');
+});

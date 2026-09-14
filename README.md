@@ -12,8 +12,8 @@ Over the same 5452-word deck:
 - **学新词** — staged learning per Kapitel: meet the word, recognise its meaning,
   recall the German, then spell it, with spaced review between sessions.
 - **单词检测** — the quiz: weak words first, both directions, spelling checked.
-- **语法专项** — der/die/das over 3020 nouns, and plural forms over ~2550. Both
-  read fields the app previously only displayed.
+- **专项训练** — der/die/das over 3020 nouns, plural forms over ~2550, and
+  dictation. The first two read fields the app previously only displayed.
 
 Progress, the spelling wrong-book, and the mastered archive live in the browser's
 `localStorage` and never leave the device. Export a backup from the home screen.
@@ -49,7 +49,10 @@ written to `dist/`. It runs as part of `npm run dev`, `npm test`, and
 | `src/data/zh-*.json` | `zh.json` |
 
 `src/store.js` owns every read and write to `localStorage`, including the one-time
-migration of progress saved under the pre-2026 id scheme.
+migration of progress saved under the pre-2026 id scheme. Writes are batched, so
+anything that reads its own state back must keep an in-memory copy and merge into
+that — re-reading storage inside a flush window sees a stale value and silently
+drops the pending change.
 
 ## Rules that keep saved progress intact
 

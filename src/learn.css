@@ -8,3 +8,8 @@
 .charBar{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
 .charKey{flex:1 1 auto;min-width:44px;padding:9px 0;font-size:17px;font-weight:700;border-radius:10px;background:#eef1f6;color:var(--ink);border:1px solid #dde2ec}
 .charKey:active{background:#dfe5f2}
+.speakBtn{border:1px solid #dde2ec;background:#eef1f6;border-radius:9px;padding:3px 9px;font-size:15px;line-height:1.4;vertical-align:middle;margin-left:6px}
+.speakBtn:active{background:#dfe5f2}
+.wordRow,.answerRow{display:flex;align-items:center;justify-content:center;gap:9px;flex-wrap:wrap}
+.answerRow{justify-content:flex-start}
+.speakBtn{margin-left:0}
