@@ -476,3 +476,86 @@ test('remembers the level and Kapitel across reloads', async ({ page }) => {
   await expect(page.locator('#learnLevel')).toHaveValue('A2');
   await expect(page.locator('#learnChapter')).toHaveValue('5');
 });
+
+test('spelling can be switched off without stalling review pacing', async ({ page }) => {
+  await page.goto(APP);
+  await ready(page);
+  await page.locator('#goLearn').click();
+  await page.selectOption('#learnLevel', 'A1');
+  await page.selectOption('#learnChapter', '1');
+  await page.selectOption('#learnCount', '5');
+  await page.locator('#learnSpellToggle').uncheck();
+  await expect(page.locator('#learnSpellNote')).toContainText('不会进入「已掌握」');
+  await page.locator('#learnStartBtn').click();
+
+  const lookup = await page.evaluate(async () => {
+    const [rows, zh] = await Promise.all([
+      (await fetch('./cards.json')).json(),
+      (await fetch('./zh.json')).json(),
+    ]);
+    const clean = (s: string) => (s || '').replace(/^[_\-–—\s]+/, '').replace(/\s*\([^)]*\)\s*$/, ' ').trim();
+    const byId: Record<string, { de: string; meaning: string }> = {};
+    for (const r of rows) byId[r[0]] = { de: r[3], meaning: zh[r[0]] || clean(r[4]) };
+    return byId;
+  });
+  const answerCorrectly = async () => {
+    const ids = await page.locator('#learnBody .choice').evaluateAll((els) =>
+      els.map((el) => (el as HTMLElement).dataset.id ?? ''));
+    const german = (await page.locator('#learnBody .learnWord').count())
+      ? ((await page.locator('#learnBody .learnWord').innerText()) || '').trim() : null;
+    const meaning = (await page.locator('#learnBody .learnZh').count())
+      ? ((await page.locator('#learnBody .learnZh').innerText()) || '').trim() : null;
+    const idx = ids.findIndex((id) => german ? lookup[id]?.de === german : lookup[id]?.meaning === meaning);
+    expect(idx, `no option matched ${JSON.stringify(german ?? meaning)}`).toBeGreaterThanOrEqual(0);
+    await page.locator('#learnBody .choice').nth(idx).click();
+    await expect(page.locator('#learnBody .choice.wrong')).toHaveCount(0);
+    await page.locator('#learnNextBtn').click();
+  };
+
+  const stages: string[] = [];
+  for (let step = 0; step < 40; step++) {
+    const badge = (await page.locator('#learnBadge').textContent()) || '';
+    if (/本轮完成/.test(badge)) break;
+    stages.push(badge.split(' · ')[0].trim());
+    if (await page.locator('#learnRemember').count()) { await page.locator('#learnRemember').click(); continue }
+    if (await page.locator('#learnBody .choice').count()) { await answerCorrectly(); continue }
+    break;
+  }
+  // no spelling stage was ever queued, and the input never appeared
+  expect(stages.filter((s) => /主动拼写/.test(s))).toHaveLength(0);
+  expect(stages.filter((s) => /认识新词/.test(s)).length).toBe(5);
+
+  // Linterval keys off cycles, which only advanced on a correct spelling. If the
+  // round never closed, every word would sit on the 10-minute step and come back
+  // forever — the reverse stage has to close it instead.
+  const state = await page.evaluate((k) => {
+    (window as any).DWStore.flush();
+    const learn = JSON.parse(localStorage.getItem(k) || '{}');
+    return Object.values(learn) as Array<{ cycles: number; spellingPass: boolean; due: number }>;
+  }, LEARN_KEY);
+  const advanced = state.filter((s) => (s.cycles || 0) >= 1);
+  expect(advanced.length).toBeGreaterThan(0);
+  for (const s of advanced) {
+    expect(s.due - Date.now()).toBeGreaterThan(60 * 60 * 1000); // pushed past the 10-minute step
+    expect(s.spellingPass).toBeFalsy(); // but not credited with spelling
+  }
+});
+
+test('a word cannot reach mastered while spelling is off', async ({ page }) => {
+  await page.goto(APP);
+  await ready(page);
+  const cards = await deck(page);
+  const target = cards.find((c) => c.level === 'A1' && String(c.chapter) === '1')!;
+  // three completed cycles and full strength — everything except having spelled it
+  await page.evaluate(([learnKey, schemaKey, id]) => {
+    localStorage.setItem(learnKey, JSON.stringify({
+      [id]: { introduced: true, strength: 5, wrong: 0, hard: 0, last: 1, due: 1, spellingPass: false, cycles: 3, known: false },
+    }));
+    localStorage.setItem(schemaKey, '2');
+  }, [LEARN_KEY, SCHEMA_KEY, target.id] as const);
+  await page.reload();
+  await ready(page);
+  await expect(page.locator('#homeMastered')).toHaveText('0');
+  // and it is still offered for review rather than archived
+  await expect(page.locator('#todayBreak')).toContainText('到期复习');
+});
