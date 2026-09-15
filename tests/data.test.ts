@@ -3,76 +3,129 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
-// The vocabulary PWA keys every scrap of a learner's progress by card id, so these
-// are data-durability tests, not cosmetics: a change that shifts ids silently
-// orphans everything already saved in people's browsers.
+// The app keys every scrap of a learner's progress by card id, so these are
+// data-durability tests, not cosmetics: a change that shifts ids silently orphans
+// everything already saved in people's browsers.
 
 const out = new URL('../dist/', import.meta.url);
-const readJson = (name: string) => JSON.parse(readFileSync(new URL(name, out), 'utf8'));
-
-type Card = [string, string, string, string, string, string, string];
-
 const build = () => execFileSync('node', ['scripts/build.mjs'], { cwd: new URL('..', import.meta.url) });
 
-describe('vocabulary card ids', () => {
-  build();
-  const cards: Card[] = readJson('cards.json');
-  const zh: Record<string, string> = readJson('zh.json');
+// src/deck.js is a classic browser script, not a module. Evaluating its shipped
+// text is the point: these tests must fail if what the browser runs drifts.
+const load = <T>(file: string, expr: string, scope: Record<string, unknown> = {}): T => {
+  const src = readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8');
+  // Browser scripts publish themselves on window; give them one to publish to.
+  const full = { window: {} as Record<string, unknown>, ...scope };
+  const names = Object.keys(full);
+  return new Function(...names, `${src}; return ${expr};`)(...names.map((n) => full[n as keyof typeof full])) as T;
+};
 
-  it('ships a non-trivial deck', () => {
-    expect(cards.length).toBeGreaterThan(4000);
+type Row = { level: string; chapter: string; de: string; en?: string; zh?: string; grammar?: string };
+type Card = Row & { id: string };
+interface Deck { parse(text: string, name?: string): { name: string; cards: Card[]; skipped: Array<{ line: number; why: string }> };
+  serialize(d: { name: string; cards: Card[] }): string; withIds(rows: Row[]): Card[]; sha256Hex(s: string): string;
+  idFor(level: string, chapter: string, de: string): string }
+
+const DWDeck = load<Deck>('deck.js', 'DWDeck');
+const FIXTURE = readFileSync(new URL('./fixtures/deck.json', import.meta.url), 'utf8');
+
+describe('card ids', () => {
+  it('computes SHA-256 exactly, umlauts and all', () => {
+    // The browser gets no crypto.subtle here, so this implementation is the only
+    // thing standing between a learner and a deck full of unrecognised words.
+    for (const v of ['', 'abc', 'a'.repeat(55), 'a'.repeat(56), 'a'.repeat(1000), 'das W\u00fcrstchen', 'gr\u00f6\u00dfer', '\u4e2d\u6587']) {
+      expect(DWDeck.sha256Hex(v), JSON.stringify(v)).toBe(createHash('sha256').update(v).digest('hex'));
+    }
   });
 
-  it('gives every card a unique id', () => {
-    expect(new Set(cards.map((c) => c[0])).size).toBe(cards.length);
+  it('still produces the ids that earlier builds shipped', () => {
+    // These were computed by the old Node build and are live in people's browsers
+    // as progress keys. They are pinned as literals on purpose: if this test ever
+    // has to be updated, every learner's history has just been orphaned.
+    expect(DWDeck.idFor('A1', '1', 'das Haus')).toBe('745f7f512f');
+    expect(DWDeck.idFor('A1', '1', 'die T\u00fcr')).toBe('c04e6fe0dd');
+    expect(DWDeck.idFor('A2', '5', 'der Bahnhof')).toBe('14b3aaa187');
   });
 
   it('derives ids from the word, never from its position in the file', () => {
     // The original scheme was `${level}-${chapter}-${lineNumber}`: inserting one
     // word renumbered 99.8% of the deck and orphaned all saved progress.
+    const { cards } = DWDeck.parse(FIXTURE, 'fixture.json');
     const expected = (level: string, chapter: string, de: string) =>
       createHash('sha256').update(`${level}|${chapter}|${de}`).digest('hex').slice(0, 10);
     const seen = new Set<string>();
-    for (const [id, level, chapter, de] of cards) {
-      const base = expected(level, chapter, de);
-      // Exact duplicates in the Glossar get a stable ordinal suffix.
-      expect(id === base || id.startsWith(`${base}-`)).toBe(true);
-      if (!seen.has(base)) {
-        expect(id).toBe(base);
-        seen.add(base);
-      }
+    for (const c of cards) {
+      const base = expected(c.level, c.chapter, c.de);
+      expect(c.id === base || c.id.startsWith(`${base}-`)).toBe(true);
+      if (!seen.has(base)) { expect(c.id).toBe(base); seen.add(base); }
     }
+    expect(new Set(cards.map((c) => c.id)).size).toBe(cards.length);
   });
 
-  it('keeps ids stable when an unrelated word is inserted', () => {
-    const idFor = (level: string, chapter: string, de: string) =>
-      createHash('sha256').update(`${level}|${chapter}|${de}`).digest('hex').slice(0, 10);
-    const before = cards.map((c) => c[0]);
-    // simulate an edit near the top of the deck
-    const mutated = [...cards];
-    mutated.splice(10, 0, [idFor('A1', '1', 'das Testwort'), 'A1', '1', 'das Testwort', 'test word', '', '']);
-    const after = mutated.filter((c) => c[3] !== 'das Testwort').map((c) => c[0]);
+  it('keeps every other id stable when a word is inserted', () => {
+    const { cards } = DWDeck.parse(FIXTURE, 'fixture.json');
+    const rows: Row[] = cards.map(({ id, ...r }) => r);
+    const before = cards.map((c) => c.id);
+    const mutated = [...rows];
+    mutated.splice(3, 0, { level: 'A1', chapter: '1', de: 'das Testwort', en: 'test word' });
+    const after = DWDeck.withIds(mutated).filter((c) => c.de !== 'das Testwort').map((c) => c.id);
     expect(after).toEqual(before);
   });
 
-  it('keys Chinese glosses by card id rather than array position', () => {
-    // Positional mapping meant one added word shifted every remaining meaning by
-    // one, silently mislabelling the rest of the deck.
-    const byId = new Map(cards.map((c) => [c[0], c]));
-    for (const id of Object.keys(zh)) {
-      const card = byId.get(id);
-      expect(card, `gloss for unknown card ${id}`).toBeDefined();
-      expect(['A1', 'A2']).toContain(card![1]);
-    }
-    const a12 = cards.filter((c) => c[1] === 'A1' || c[1] === 'A2');
-    expect(Object.keys(zh)).toHaveLength(a12.length);
+  it('gives an exactly duplicated word a stable ordinal instead of a collision', () => {
+    const rows: Row[] = [
+      { level: 'A1', chapter: '1', de: 'Deutsch', en: 'German' },
+      { level: 'A1', chapter: '1', de: 'Deutsch', en: 'German' },
+      { level: 'A1', chapter: '1', de: 'das Haus', en: 'house' },
+    ];
+    const ids = DWDeck.withIds(rows).map((c) => c.id);
+    expect(ids[1]).toBe(`${ids[0]}-2`);
+    expect(new Set(ids).size).toBe(3);
   });
 
-  it('leaves no card without German or English text', () => {
-    for (const c of cards) {
-      expect(c[3].trim()).not.toBe('');
-      expect(c[4].trim()).not.toBe('');
-    }
+  it('survives an export/import round trip without moving a single id', () => {
+    const first = DWDeck.parse(FIXTURE, 'fixture.json');
+    const again = DWDeck.parse(DWDeck.serialize(first), 'again.json');
+    expect(again.cards.map((c) => c.id)).toEqual(first.cards.map((c) => c.id));
+    expect(again.cards.map((c) => c.zh ?? '')).toEqual(first.cards.map((c) => c.zh ?? ''));
+    expect(again.name).toBe(first.name);
+  });
+});
+
+describe('deck import', () => {
+  it('reads a spreadsheet exported as CSV, header aliases included', () => {
+    const csv = 'Deutsch,Chinese,English,Kapitel,Niveau\ndas Haus,\u623f\u5b50,house,1,A1\n"die T\u00fcr, gro\u00df",\u95e8,door,1,A1\n';
+    const { cards } = DWDeck.parse(csv, 'woerter.csv');
+    expect(cards).toHaveLength(2);
+    expect(cards[0]).toMatchObject({ level: 'A1', chapter: '1', de: 'das Haus', zh: '\u623f\u5b50', en: 'house' });
+    // a quoted comma is one field, not two columns
+    expect(cards[1].de).toBe('die T\u00fcr, gro\u00df');
+  });
+
+  it('reads tab-separated text and defaults the optional columns', () => {
+    const { cards } = DWDeck.parse('de\tzh\ndas Haus\t\u623f\u5b50\n', 'list.tsv');
+    expect(cards[0]).toMatchObject({ level: 'A1', chapter: '1', de: 'das Haus', zh: '\u623f\u5b50', en: '' });
+  });
+
+  it('reports the rows it cannot use instead of dropping them silently', () => {
+    // An import that quietly loses a quarter of the file is how you discover six
+    // weeks later that a chapter was never there.
+    const { cards, skipped } = DWDeck.parse('de,zh\ndas Haus,\u623f\u5b50\n,\u6ca1\u6709\u5fb7\u8bed\ndas Brot,\n', 'x.csv');
+    expect(cards).toHaveLength(1);
+    expect(skipped.map((s) => s.line)).toEqual([2, 3]);
+  });
+
+  it('refuses a file it cannot make a deck out of', () => {
+    expect(() => DWDeck.parse('', 'x.csv')).toThrow();
+    expect(() => DWDeck.parse('{"cards":[]}', 'x.json')).toThrow();
+    expect(() => DWDeck.parse('a,b,c\n1,2,3\n', 'x.csv')).toThrow(/de/);
+    expect(() => DWDeck.parse('{ not json', 'x.json')).toThrow();
+  });
+
+  it('accepts a bare array and takes the name from the file', () => {
+    const { cards, name } = DWDeck.parse(JSON.stringify([{ de: 'das Haus', en: 'house' }]), 'Mein Wortschatz.json');
+    expect(cards).toHaveLength(1);
+    expect(name).toBe('Mein Wortschatz');
   });
 });
 
@@ -103,7 +156,7 @@ describe('vocabulary build outputs', () => {
   it('does not modify its own sources', () => {
     // An earlier build rewrote its own learn.js source in place through
     // 23 exact-string replacements, so editing a UI string broke the deploy.
-    const sources = ['learn.core.js', 'wrongbook-addon.js', 'mastered-addon.js', 'store.js', 'sw.source.js'];
+    const sources = ['learn.core.js', 'wrongbook-addon.js', 'mastered-addon.js', 'store.js', 'deck.js', 'sw.source.js'];
     const hash = () => sources.map((f) => createHash('sha256')
       .update(readFileSync(new URL(`../src/${f}`, import.meta.url)))
       .digest('hex')).join();
@@ -114,98 +167,90 @@ describe('vocabulary build outputs', () => {
 });
 
 describe('plural derivation', () => {
-  build();
-  const cards: Card[] = readJson('cards.json');
+  // The real function, evaluated out of the file the browser loads. A drill that
+  // derives a plural wrongly actively teaches the learner an error, which is
+  // worse than having no drill, hence the ground truth below.
+  const { LpluralOf } = load<{ LpluralOf(c: { de: string; grammar: string }): string | null }>(
+    'drills-addon.js',
+    '{ LpluralOf }',
+    { DWStore: { read: () => ({}), onMigrated: () => {}, prefs: () => ({}), queue: () => {} } },
+  );
+  const plural = (de: string, grammar: string) => LpluralOf({ de, grammar });
 
-  // Mirrors LpluralOf / LumlautStem in src/drills-addon.js. The Glossar writes
-  // plurals compactly — a leading " or * marks an umlaut — so the drill derives
-  // the full form. A wrong derivation would actively teach the learner an error,
-  // which is worse than having no drill, hence the ground-truth list below.
-  const stemOf = (de: string) => de.replace(/^(der|die|das)\s+/i, '').trim();
-  const umlautStem = (stem: string) => {
-    const m = /(au|[aou])(?![\s\S]*(?:au|[aou]))/i.exec(stem);
-    if (!m) return null;
-    const map: Record<string, string> = { a: 'ä', o: 'ö', u: 'ü', au: 'äu', A: 'Ä', O: 'Ö', U: 'Ü', Au: 'Äu', AU: 'ÄU' };
-    const hit = m[1];
-    const rep = map[hit] ?? map[hit.toLowerCase()];
-    return rep ? stem.slice(0, m.index) + rep + stem.slice(m.index + hit.length) : null;
-  };
-  const pluralOf = (de: string, grammar: string) => {
-    const raw = (grammar || '').trim();
-    if (!raw) return null;
-    const explicit = raw.match(/^Plural:\s*(?:die\s+)?(.+)$/i);
-    if (explicit) {
-      const form = explicit[1].trim();
-      return /^[A-Za-zÄÖÜäöüß][\wÄÖÜäöüß-]*$/.test(form) ? `die ${form}` : null;
-    }
-    const short = raw.match(/^(["*]*)-?(n|en|nen|e|er|s|se|ien|es|€)?$/);
-    if (!short) return null;
-    const suffix = (short[2] || '').replace(/€/g, 'e');
-    let stem = stemOf(de);
-    if (!stem || /[\s|/]/.test(stem)) return null;
-    if (short[1]) {
-      const u = umlautStem(stem);
-      if (!u) return null;
-      stem = u;
-    }
-    return `die ${stem}${suffix}`;
-  };
-
-  const groundTruth: Record<string, string> = {
-    Vater: 'die Väter', Apfel: 'die Äpfel', Mutter: 'die Mütter', Stadt: 'die Städte',
-    Hand: 'die Hände', Nacht: 'die Nächte', Sohn: 'die Söhne', Zug: 'die Züge',
-    Arzt: 'die Ärzte', Garten: 'die Gärten', Laden: 'die Läden', Mantel: 'die Mäntel',
-    Vogel: 'die Vögel', Haus: 'die Häuser', Land: 'die Länder', Mann: 'die Männer',
-    Buch: 'die Bücher', Fluss: 'die Flüsse', Stuhl: 'die Stühle',
-    Rock: 'die Röcke', Ball: 'die Bälle', Maus: 'die Mäuse', Turm: 'die Türme',
-    Hals: 'die Hälse', Kind: 'die Kinder', Ei: 'die Eier', Bild: 'die Bilder',
-    Kindergarten: 'die Kindergärten', Handtuch: 'die Handtücher', Tag: 'die Tage', Wort: 'die Wörter',
-    Beruf: 'die Berufe', Flasche: 'die Flaschen', Koffer: 'die Koffer', Auto: 'die Autos',
-    Freundin: 'die Freundinnen', Rucksack: 'die Rucksäcke', Einkauf: 'die Einkäufe',
-    Hauptsatz: 'die Hauptsätze', Schwimmbad: 'die Schwimmbäder', Wand: 'die Wände',
-  };
-
-  // A few nouns have two correct plurals with different senses, recorded on
-  // separate cards: das Wort is die Wörter (separate words) and die Worte
-  // (connected speech).
-  const multiPlural: Record<string, string[]> = { Wort: ['die Wörter', 'die Worte'] };
+  // A compact marker: a leading " or * means umlaut the last stem vowel, the
+  // optional - stands for the singular stem, and the rest is the suffix.
+  const groundTruth: Array<[string, string, string]> = [
+    ['der Vater', '"-', 'die V\u00e4ter'], ['der Apfel', '"-', 'die \u00c4pfel'],
+    ['die Mutter', '"-', 'die M\u00fctter'], ['der Garten', '"-', 'die G\u00e4rten'],
+    ['der Kindergarten', '"-', 'die Kinderg\u00e4rten'],
+    ['die Stadt', '"-e', 'die St\u00e4dte'], ['die Hand', '"-e', 'die H\u00e4nde'],
+    ['die Nacht', '"-e', 'die N\u00e4chte'], ['der Sohn', '"-e', 'die S\u00f6hne'],
+    ['der Zug', '"-e', 'die Z\u00fcge'], ['der Arzt', '"-e', 'die \u00c4rzte'],
+    ['der Rock', '"-e', 'die R\u00f6cke'], ['der Ball', '"-e', 'die B\u00e4lle'],
+    ['die Maus', '"-e', 'die M\u00e4use'], ['der Turm', '"-e', 'die T\u00fcrme'],
+    ['der Hals', '"-e', 'die H\u00e4lse'], ['der Rucksack', '"-e', 'die Rucks\u00e4cke'],
+    ['der Hauptsatz', '"-e', 'die Haupts\u00e4tze'],
+    ['das Haus', '"-er', 'die H\u00e4user'], ['das Land', '"-er', 'die L\u00e4nder'],
+    ['der Mann', '"-er', 'die M\u00e4nner'], ['das Buch', '"-er', 'die B\u00fccher'],
+    ['das Wort', '"-er', 'die W\u00f6rter'], ['das Handtuch', '"-er', 'die Handt\u00fccher'],
+    ['das Schwimmbad', '"-er', 'die Schwimmb\u00e4der'],
+    ['das Kind', '-er', 'die Kinder'], ['das Ei', '-er', 'die Eier'], ['das Bild', '-er', 'die Bilder'],
+    ['der Tag', '-e', 'die Tage'], ['der Beruf', '-e', 'die Berufe'],
+    ['die Flasche', '-n', 'die Flaschen'], ['der Koffer', '-', 'die Koffer'],
+    ['das Auto', '-s', 'die Autos'], ['die Freundin', '-nen', 'die Freundinnen'],
+    ['der Fluss', '"-e', 'die Fl\u00fcsse'], ['der Stuhl', '"-e', 'die St\u00fchle'],
+    // Word lists exported from a PDF carry mojibake: a euro sign where an e belongs.
+    ['die Stadt', '"\u20ac', 'die St\u00e4dte'],
+    // and the explicit form, which any hand-made deck can use instead
+    ['das Wort', 'Plural: die Worte', 'die Worte'],
+    ['das Haus', 'Plural: H\u00e4user', 'die H\u00e4user'],
+  ];
 
   it('derives known German plurals correctly, umlauts included', () => {
-    const wrong: string[] = [];
-    for (const [word, expected] of Object.entries(groundTruth)) {
-      // A word can appear more than once; only entries that carry plural data
-      // produce a question, so check those.
-      const withData = cards.filter((c) => stemOf(c[3]) === word && /^(der|die|das)\s/i.test(c[3]) && c[5]?.trim());
-      expect(withData.length, `${word} has no plural data in the deck`).toBeGreaterThan(0);
-      for (const c of withData) {
-        const got = pluralOf(c[3], c[5]);
-        const allowed = multiPlural[word] ?? [expected];
-        if (!got || !allowed.includes(got)) wrong.push(`${word}: got ${got}, expected one of ${allowed.join(' / ')}`);
-      }
-    }
+    const wrong = groundTruth
+      .map(([de, marker, want]) => [de, plural(de, marker), want] as const)
+      .filter(([, got, want]) => got !== want)
+      .map(([de, got, want]) => `${de}: got ${got}, expected ${want}`);
     expect(wrong).toEqual([]);
   });
 
   it('returns nothing rather than guessing when the data is absent or ambiguous', () => {
-    // "der Platz" meaning "room" carries no plural marker — it must be skipped,
-    // not guessed at.
-    const bare = cards.find((c) => c[3] === 'der Platz' && !c[5]?.trim());
-    expect(bare).toBeDefined();
-    expect(pluralOf(bare![3], bare![5])).toBeNull();
-    expect(pluralOf('die Pizza', '-s/Pizzen')).toBeNull();
-    expect(pluralOf('das Ding', '5')).toBeNull();
+    expect(plural('der Platz', '')).toBeNull();
+    expect(plural('die Pizza', '-s/Pizzen')).toBeNull();
+    expect(plural('das Ding', '5')).toBeNull();
+    expect(plural('das Ding', 'Plural: die Dinge, die Dinger')).toBeNull();
+    // nothing to umlaut
+    expect(plural('das Ding', '"-e')).toBeNull();
   });
 
-  it('covers a worthwhile share of the nouns', () => {
-    const nouns = cards.filter((c) => /^(der|die|das)\s/i.test(c[3]));
-    const drillable = nouns.filter((c) => pluralOf(c[3], c[5]));
-    expect(nouns.length).toBeGreaterThan(2900);
-    expect(drillable.length).toBeGreaterThan(2400);
+  it('never ships a plural the drill would derive differently', () => {
+    // starter-deck.json is the app's own vocabulary, loaded by the 「立即开始背词」
+    // button. A noun whose written plural and derived plural disagree would be the
+    // app teaching its own mistake.
+    const { cards } = DWDeck.parse(readFileSync(new URL('../src/starter-deck.json', import.meta.url), 'utf8'), 'starter-deck.json');
+    const nouns = cards.filter((c) => /^(der|die|das)\s/.test(c.de));
+    const written = nouns.filter((c) => c.grammar);
+    const wrong = written
+      .map((c) => ({ de: c.de, want: c.grammar!.replace(/^Plural:\s*/, ''), got: plural(c.de, c.grammar!) }))
+      .filter((r) => r.got !== r.want);
+    expect(wrong).toEqual([]);
+    expect(cards.length).toBeGreaterThan(250);
+    expect(written.length).toBeGreaterThan(100);
+    // all three genders, or the der/die/das drill is a coin toss
+    for (const art of ['der ', 'die ', 'das ']) {
+      expect(nouns.filter((c) => c.de.startsWith(art)).length, art).toBeGreaterThan(30);
+    }
+    // and every card can actually be asked about in both directions
+    for (const c of cards) { expect(c.de.trim()).not.toBe(''); expect(c.en || c.zh).toBeTruthy(); }
   });
 
-  it('gives every noun an article for the gender drill', () => {
-    const nouns = cards.filter((c) => /^(der|die|das)\s/i.test(c[3]));
-    for (const c of nouns) expect(c[3]).toMatch(/^(der|die|das)\s+\S/);
+  it('drives the drill off the deck that is actually loaded', () => {
+    const { cards } = DWDeck.parse(FIXTURE, 'fixture.json');
+    const nouns = cards.filter((c) => /^(der|die|das)\s/i.test(c.de));
+    const drillable = nouns.filter((c) => plural(c.de, c.grammar ?? ''));
+    expect(nouns.length).toBeGreaterThan(20);
+    expect(drillable.length).toBeGreaterThan(15);
+    for (const c of nouns) expect(c.de).toMatch(/^(der|die|das)\s+\S/);
   });
 });
 

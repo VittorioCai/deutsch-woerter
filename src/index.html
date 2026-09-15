@@ -11,22 +11,47 @@
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="./learn.css">
 <script src="./store.js"></script>
-<title>Netzwerk neu A1–B1 单词检测</title>
+<script src="./deck.js"></script>
+<title>Deutsch Wörter · 德语单词学习</title>
 <style>
 :root{--bg:#f6f7fb;--card:#fff;--ink:#172033;--muted:#697386;--line:#e5e8ef;--accent:#315efb;--good:#0a8f55;--bad:#c73737;--soft:#eef2ff;--shadow:0 14px 40px rgba(30,42,70,.10)}
-*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Noto Sans SC",Arial,sans-serif}.wrap{max-width:860px;margin:0 auto;padding:20px 14px 80px}h1{font-size:clamp(25px,6vw,38px);margin:8px 0 6px}.sub{color:var(--muted);line-height:1.6;margin-bottom:16px}.panel,.quiz{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}.panel{padding:15px;margin:14px 0}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted)}select,input[type=text]{width:100%;border:1px solid #cfd5e2;border-radius:12px;background:#fff;color:var(--ink);font-size:16px;padding:12px}button{border:0;border-radius:12px;padding:12px 16px;font-size:15px;font-weight:700;cursor:pointer}.primary{background:var(--accent);color:#fff}.secondary{background:#eef1f6;color:var(--ink)}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}.stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:11px;text-align:center}.stat b{display:block;font-size:20px}.stat span{font-size:12px;color:var(--muted)}.quiz{padding:22px;min-height:355px;display:flex;flex-direction:column;justify-content:center;scroll-margin-top:12px}.badge{display:inline-flex;align-items:center;gap:6px;background:var(--soft);color:#4052a5;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:700;width:max-content}.prompt{font-size:clamp(25px,6vw,42px);font-weight:800;line-height:1.2;margin:22px 0 7px}.hint{color:var(--muted);margin-bottom:18px;min-height:24px}.answerBox{display:flex;gap:8px}.answerBox input{flex:1}.feedback{margin-top:16px;border-radius:14px;padding:14px;display:none;line-height:1.55}.feedback.show{display:block}.feedback.ok{background:#edf9f3;border:1px solid #bfe9d4}.feedback.no{background:#fff2f2;border:1px solid #f2c4c4}.deAnswer{font-size:23px;font-weight:800;margin-bottom:4px}.meta{font-size:13px;color:var(--muted)}.example{margin-top:8px;padding:10px 12px;border-left:3px solid #b4bee0;background:#fafbff;border-radius:8px}.progress{height:8px;background:#e9edf5;border-radius:99px;overflow:hidden;margin:10px 0 4px}.progress>div{height:100%;background:var(--accent);width:0%}.small{font-size:12px;color:var(--muted);line-height:1.5}.switch{flex-direction:row;align-items:center;gap:7px;color:var(--ink);font-size:14px}.nextRow{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom));z-index:10;padding-top:10px;background:linear-gradient(to bottom,rgba(255,255,255,0),#fff 26%)}#nextBtn{width:100%;min-height:50px;box-shadow:0 8px 22px rgba(49,94,251,.18)}.tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.tools button{flex:1 1 150px}.install{background:#111827;color:#fff}.loading{padding:16px;border-radius:14px;background:#fff;border:1px solid var(--line);color:var(--muted);margin:14px 0}.dots{display:flex;gap:4px;margin-top:7px}.dot{width:9px;height:9px;border-radius:50%;background:#d9deea}.dot.on{background:#4a69ff}#fileImport{display:none}.dwNotice{display:grid;gap:8px}.dwNotice:not(:empty){margin:12px 0}.dwNoticeItem{border-radius:14px;padding:12px 14px;font-size:14px;line-height:1.6;border:1px solid}.dwNoticeItem.ok{background:#edf9f3;border-color:#bfe9d4}.dwNoticeItem.warn{background:#fff8e8;border-color:#f0dcae}.dwNoticeItem.bad{background:#fff2f2;border-color:#f2c4c4}.dwNoticeItem code{font-size:12px;background:rgba(0,0,0,.06);padding:1px 5px;border-radius:5px}.dwNoticeActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.dwNoticeActions button{padding:8px 12px;font-size:13px}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Noto Sans SC",Arial,sans-serif}.wrap{max-width:860px;margin:0 auto;padding:20px 14px 80px}h1{font-size:clamp(25px,6vw,38px);margin:8px 0 6px}.sub{color:var(--muted);line-height:1.6;margin-bottom:16px}.panel,.quiz{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}.panel{padding:15px;margin:14px 0}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted)}select,input[type=text]{width:100%;border:1px solid #cfd5e2;border-radius:12px;background:#fff;color:var(--ink);font-size:16px;padding:12px}button{border:0;border-radius:12px;padding:12px 16px;font-size:15px;font-weight:700;cursor:pointer}.primary{background:var(--accent);color:#fff}.secondary{background:#eef1f6;color:var(--ink)}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}.stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:11px;text-align:center}.stat b{display:block;font-size:20px}.stat span{font-size:12px;color:var(--muted)}.quiz{padding:22px;min-height:355px;display:flex;flex-direction:column;justify-content:center;scroll-margin-top:12px}.badge{display:inline-flex;align-items:center;gap:6px;background:var(--soft);color:#4052a5;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:700;width:max-content}.prompt{font-size:clamp(25px,6vw,42px);font-weight:800;line-height:1.2;margin:22px 0 7px}.hint{color:var(--muted);margin-bottom:18px;min-height:24px}.answerBox{display:flex;gap:8px}.answerBox input{flex:1}.feedback{margin-top:16px;border-radius:14px;padding:14px;display:none;line-height:1.55}.feedback.show{display:block}.feedback.ok{background:#edf9f3;border:1px solid #bfe9d4}.feedback.no{background:#fff2f2;border:1px solid #f2c4c4}.deAnswer{font-size:23px;font-weight:800;margin-bottom:4px}.meta{font-size:13px;color:var(--muted)}.example{margin-top:8px;padding:10px 12px;border-left:3px solid #b4bee0;background:#fafbff;border-radius:8px}.progress{height:8px;background:#e9edf5;border-radius:99px;overflow:hidden;margin:10px 0 4px}.progress>div{height:100%;background:var(--accent);width:0%}.small{font-size:12px;color:var(--muted);line-height:1.5}.switch{flex-direction:row;align-items:center;gap:7px;color:var(--ink);font-size:14px}.nextRow{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom));z-index:10;padding-top:10px;background:linear-gradient(to bottom,rgba(255,255,255,0),#fff 26%)}#nextBtn{width:100%;min-height:50px;box-shadow:0 8px 22px rgba(49,94,251,.18)}.tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.tools button{flex:1 1 150px}.install{background:#111827;color:#fff}.loading{padding:16px;border-radius:14px;background:#fff;border:1px solid var(--line);color:var(--muted);margin:14px 0}.dots{display:flex;gap:4px;margin-top:7px}.dot{width:9px;height:9px;border-radius:50%;background:#d9deea}.dot.on{background:#4a69ff}#fileImport,#deckFile{display:none}.gateTitle{margin:2px 0 8px;font-size:21px}.gateBig{display:flex;flex-direction:column;gap:5px;width:100%;text-align:left;background:linear-gradient(135deg,#3f6bff,#2b49d6);color:#fff;padding:18px 20px;box-shadow:0 10px 26px rgba(49,94,251,.28)}.gateBig:hover{filter:brightness(1.06)}.gateBig:disabled{opacity:.6;cursor:default}.gateBigTitle{font-size:18px;font-weight:800}.gateBigSub{font-size:13px;font-weight:500;line-height:1.6;opacity:.92}.gateOr{display:flex;align-items:center;gap:12px;margin:16px 0;color:var(--muted);font-size:13px}.gateOr::before,.gateOr::after{content:"";flex:1;height:1px;background:var(--line)}.dropZone{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;border:2px dashed #c3ccdf;border-radius:16px;padding:26px 16px;background:#fbfcff;transition:border-color .15s,background .15s}.dropZone.over{border-color:var(--accent);background:var(--soft)}.gateHelp{margin-top:14px}.gateHelp summary{cursor:pointer;font-weight:700;color:var(--ink)}.gateHelp p{line-height:1.7}.gateHelp pre{background:#f3f5fa;border:1px solid var(--line);border-radius:10px;padding:10px 12px;overflow-x:auto;font-size:12px;margin:8px 0}.dwNotice{display:grid;gap:8px}.dwNotice:not(:empty){margin:12px 0}.dwNoticeItem{border-radius:14px;padding:12px 14px;font-size:14px;line-height:1.6;border:1px solid}.dwNoticeItem.ok{background:#edf9f3;border-color:#bfe9d4}.dwNoticeItem.warn{background:#fff8e8;border-color:#f0dcae}.dwNoticeItem.bad{background:#fff2f2;border-color:#f2c4c4}.dwNoticeItem code{font-size:12px;background:rgba(0,0,0,.06);padding:1px 5px;border-radius:5px}.dwNoticeActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.dwNoticeActions button{padding:8px 12px;font-size:13px}
 @media(max-width:680px){.grid{grid-template-columns:1fr 1fr}.stats{grid-template-columns:1fr 1fr}.quiz{padding:18px}.answerBox{flex-direction:column}.tools button{flex-basis:100%}}
 </style>
 </head>
 <body>
 <div class="wrap">
-<h1>Netzwerk neu A1–B1 单词检测</h1>
-<div class="sub">基于你整理的 Netzwerk neu A1 / A2 / B1 全量词库。错词会提高抽取概率，学习记录保存在本机；安装后可以像 App 一样离线使用。</div>
-<div id="loading" class="loading">正在加载词库…</div>
+<h1>Deutsch Wörter</h1>
+<div class="sub">导入你自己的德语词库，先认识、再复习、最后拼写。错词会提高抽取概率，学习记录保存在本机；安装后可以像 App 一样离线使用。</div>
+<div id="loading" class="loading">正在读取词库…</div>
+<div id="deckGate" class="panel" style="display:none">
+  <h2 class="gateTitle">两种开始方式</h2>
+  <div class="sub">不用注册，不上传，不联网也能用。词库和学习记录都只存在这台设备的浏览器里。</div>
+  <div id="deckError" class="dwNoticeItem bad" style="display:none"></div>
+  <button class="gateBig" id="deckDemoBtn">
+    <span class="gateBigTitle">立即开始背词</span>
+    <span class="gateBigSub">用内置示例词库：284 个德语常用词，含中文释义、复数和例句。随时可以换掉。</span>
+  </button>
+  <div class="gateOr"><span>或者</span></div>
+  <div class="dropZone" id="deckDrop">
+    <b>导入你自己的词库</b>
+    <button class="secondary" id="deckPickBtn">选择文件</button>
+    <span class="small">.csv / .tsv / .json，也可以直接拖进来</span>
+  </div>
+  <input id="deckFile" type="file" accept=".json,.csv,.tsv,.txt,application/json,text/csv,text/plain">
+  <details class="small gateHelp">
+    <summary>词库文件长什么样？</summary>
+    <p>表格的第一行是表头，可用的列名：<code>de</code>（德语，必填）、<code>zh</code>（中文释义）、<code>en</code>（英文释义）、<code>level</code>（级别）、<code>chapter</code>（章节）、<code>grammar</code>（语法信息）、<code>example</code>（例句）。除了 <code>de</code>，其他都可以省略，但 <code>zh</code> 和 <code>en</code> 至少要有一个；不写 <code>level</code> / <code>chapter</code> 就归入 A1 Kapitel 1。</p>
+    <pre>de,zh,level,chapter
+das Haus,房子,A1,1
+die Tür,门,A1,1</pre>
+    <p>JSON 则是 <code>{"name":"我的词库","cards":[{"de":"das Haus","zh":"房子"}]}</code>，也就是“导出词库”按钮导出的样子。同一个词在同一章重复出现时靠顺序区分，所以导入时请保持原有行序。</p>
+  </details>
+</div>
 <div id="app" style="display:none">
 <div class="panel">
   <div class="grid">
-    <label>级别<select id="level"><option value="ALL">A1 + A2 + B1</option><option>A1</option><option>A2</option><option>B1</option></select></label>
+    <label>级别<select id="level"><option value="ALL">全部级别</option></select></label>
     <label>章节<select id="chapter"><option value="ALL">全部章节</option></select></label>
     <label>方向<select id="direction"><option value="en-de">英文 → 德语</option><option value="de-en">德语 → 英文</option></select></label>
     <label>本轮题数<select id="count"><option>10</option><option selected>20</option><option>30</option><option>50</option><option>100</option><option>200</option></select></label>
@@ -42,9 +67,12 @@
     <button class="install" id="installBtn" style="display:none">安装到手机桌面</button>
     <button class="secondary" id="exportBtn">导出学习记录</button>
     <button class="secondary" id="importBtn">导入学习记录</button>
+    <button class="secondary" id="deckExportBtn">导出词库</button>
+    <button class="secondary" id="deckSwapBtn">更换词库</button>
     <input id="fileImport" type="file" accept="application/json,.json">
   </div>
   <div class="small" id="appStatus"></div>
+  <div class="small" id="deckInfo"></div>
   <div class="small" id="bankInfo"></div>
 </div>
 <div class="stats">
@@ -70,6 +98,7 @@
 </div>
 <script>
 let CARDS=[];
+let DECK=null;
 const STORE_KEY=DWStore.KEYS.QUIZ;
 let progress=DWStore.read(STORE_KEY,{});
 DWStore.onMigrated(()=>{progress=DWStore.read(STORE_KEY,{})});
@@ -86,8 +115,10 @@ function state(c){return progress[c.id]||{seen:0,correct:0,wrong:0,mastery:0,las
 function save(c,ok){const s=state(c);s.seen++;s.last=Date.now();if(ok){s.correct++;s.mastery=Math.min(5,(s.mastery||0)+1)}else{s.wrong++;s.mastery=Math.max(0,(s.mastery||0)-1)}progress[c.id]=s;DWStore.queue(STORE_KEY,()=>progress)}
 function nounAlts(c){if(!isNoun(c))return[c];const g=cleanGloss(c.en);return CARDS.filter(x=>x.level===c.level&&isNoun(x)&&cleanGloss(x.en)===g)}
 function filtered(){const l=$("level").value,ch=$("chapter").value;return CARDS.filter(c=>(l==="ALL"||c.level===l)&&(ch==="ALL"||String(c.chapter)===ch))}
-function chapters(){const l=$("level").value,chs=[...new Set(CARDS.filter(c=>l==="ALL"||c.level===l).map(c=>String(c.chapter)))].sort((a,b)=>+a-+b);$("chapter").innerHTML='<option value="ALL">全部章节</option>'+chs.map(x=>`<option value="${x}">Kapitel ${x}</option>`).join("");bank()}
-function bank(){const n=filtered().length,by={A1:0,A2:0,B1:0};CARDS.forEach(c=>by[c.level]++);$("bankInfo").textContent=`当前筛选：${n} 词｜题库：A1 ${by.A1} · A2 ${by.A2} · B1 ${by.B1} · 总计 ${CARDS.length}`;$("sWeak").textContent=Object.values(progress).filter(s=>s.wrong>0&&s.mastery<4).length}
+const cmpLevel=(a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true,sensitivity:"base"});
+function levelOptions(){const ls=[...new Set(CARDS.map(c=>c.level))].sort(cmpLevel);$("level").innerHTML=`<option value="ALL">全部级别</option>`+ls.map(l=>`<option value="${esc(l)}">${esc(l)}</option>`).join("")}
+function chapters(){const l=$("level").value,chs=[...new Set(CARDS.filter(c=>l==="ALL"||c.level===l).map(c=>String(c.chapter)))].sort(cmpLevel);$("chapter").innerHTML='<option value="ALL">全部章节</option>'+chs.map(x=>`<option value="${esc(x)}">Kapitel ${esc(x)}</option>`).join("");bank()}
+function bank(){const n=filtered().length,by=new Map();CARDS.forEach(c=>by.set(c.level,(by.get(c.level)||0)+1));const parts=[...by.keys()].sort(cmpLevel).map(l=>`${l} ${by.get(l)}`);$("bankInfo").textContent=`当前筛选：${n} 词｜题库：${parts.join(" · ")}${parts.length>1?` · 总计 ${CARDS.length}`:""}`;$("sWeak").textContent=Object.values(progress).filter(s=>s.wrong>0&&s.mastery<4).length}
 function weighted(a){return a.map(c=>{const s=state(c),p=$("weakFirst").checked?(6-(s.mastery||0))+Math.min(4,s.wrong||0):1;return{c,k:Math.random()**(1/Math.max(1,p))}}).sort((a,b)=>b.k-a.k).map(x=>x.c)}
 function bring(el,block="nearest"){if(!el)return;requestAnimationFrame(()=>{const r=el.getBoundingClientRect(),vh=innerHeight||document.documentElement.clientHeight;if(r.top<8||r.bottom>vh-8){try{el.scrollIntoView({behavior:"smooth",block})}catch(e){el.scrollIntoView()}}})}
 function start(weak=false){pool=filtered();if(weak)pool=pool.filter(c=>{const s=state(c);return s.wrong>0&&s.mastery<4});if(!pool.length){alert(weak?"当前筛选下还没有错词。":"当前筛选没有词条。");return}session=weighted(pool).slice(0,Math.min(+$("count").value,pool.length));index=correct=streak=0;answered=false;$("answer").disabled=$("submitBtn").disabled=$("showBtn").disabled=false;question();bring(document.querySelector(".quiz"),"start")}
@@ -99,12 +130,55 @@ function reveal(ok){if(answered)return;answered=true;const c=session[index];if(o
 function check(){const v=$("answer").value.trim();if(!v)return;reveal(accepted(session[index],v))}
 function finish(){const n=session.length,a=n?Math.round(correct/n*100):0;$("badge").textContent="本轮完成";$("bar").style.width="100%";$("prompt").textContent=`${correct} / ${n} 正确`;$("hint").textContent=`正确率 ${a}%。可以再点“只练错词”。`;$("answer").disabled=$("submitBtn").disabled=$("showBtn").disabled=true;$("feedback").className="feedback";$("nextBtn").style.display="none";stats(true)}
 function stats(done=false){const n=session.length||0,shown=done?n:Math.min(index+1,n),att=done?n:index+(answered?1:0);$("sNow").textContent=`${shown}/${n}`;$("sAcc").textContent=att?Math.round(correct/att*100)+"%":"—";$("sStreak").textContent=streak;$("sWeak").textContent=Object.values(progress).filter(s=>s.wrong>0&&s.mastery<4).length;$("bar").style.width=n?`${Math.min(100,((index+(answered?1:0))/n)*100)}%`:"0%";bank()}
-async function loadCards(){$("loading").textContent="正在加载词库…";try{const r=await fetch("./cards.json",{cache:"no-store"});if(!r.ok)throw new Error(`HTTP ${r.status}`);const rows=await r.json();if(!Array.isArray(rows)||!rows.length)throw new Error("词库内容无效");CARDS=rows.map(r=>({id:r[0],level:r[1],chapter:r[2],de:r[3],en:r[4],grammar:r[5]||"",example:r[6]||""}));DWStore.migrate(CARDS);$("loading").style.display="none";$("app").style.display="";chapters();stats();return CARDS}catch(e){console.error(e);$("loading").innerHTML=`<b>词库加载失败：</b>${String(e&&e.message||e)}<div class="dwNoticeActions"><button class="primary" id="retryLoad">重新加载</button></div>`;$("loading").style.display="";const b=$("retryLoad");if(b)b.onclick=()=>loadCards();throw e}}
+// The deck lives on the device, not in the build, so boot has three outcomes:
+// a deck is there and the app starts, no deck is there and the import gate takes
+// over, or the local database is unreachable and the gate says so. __cardsReady
+// simply stays pending until a deck exists, which is what every other module is
+// waiting on anyway.
+let deckReady;window.__cardsReady=new Promise(r=>{deckReady=r});
+function showGate(html){$("loading").style.display="none";$("app").style.display="none";$("deckGate").style.display="";const e=$("deckError");if(html){e.innerHTML=html;e.style.display=""}else e.style.display="none"}
+function applyDeck(deck){DECK=deck;window.__deck=deck;CARDS=deck.cards.map(c=>({id:c.id,level:c.level,chapter:String(c.chapter),de:c.de,en:c.en||"",grammar:c.grammar||"",example:c.example||"",zh:c.zh||""}));DWStore.migrate(CARDS);$("loading").style.display="none";$("deckGate").style.display="none";$("app").style.display="";$("deckInfo").innerHTML=`当前词库：${esc(deck.name)} · ${CARDS.length} 个词条${deck.source==="starter"?'（示例词库，点“更换词库”可以换成你自己的）':""}`;levelOptions();chapters();stats();deckReady(CARDS)}
+async function useDeckFile(file){if(!file)return;useDeckText(await file.text(),file.name)}
+// The one-click path. Someone who has just landed here has no word list on hand,
+// and asking for a file before showing anything is how a visitor becomes a
+// bounce — so the app brings a small one of its own.
+async function useStarterDeck(){const b=$("deckDemoBtn");b.disabled=true;
+  try{
+    const r=await fetch("./starter-deck.json",{cache:"no-store"});
+    if(!r.ok)throw new Error(`HTTP ${r.status}`);
+    await useDeckText(await r.text(),"starter-deck.json","starter");
+  }catch(e){console.error(e);showGate(`<b>示例词库没能加载：</b>${esc(String(e&&e.message||e))}`)}
+  finally{b.disabled=false}}
+async function useDeckText(text,filename,source=""){
+  try{
+    const deck=DWDeck.parse(text,filename);
+    deck.source=source;
+    if(deck.skipped.length&&!confirm(`有 ${deck.skipped.length} 行没能读懂，将被跳过：\n\n${deck.skipped.slice(0,5).map(x=>`第 ${x.line} 行：${x.why}`).join("\n")}${deck.skipped.length>5?"\n…":""}\n\n继续导入其余 ${deck.cards.length} 个词条吗？`))return;
+    // Replacing a deck never touches progress: records are keyed by the word
+    // itself, so a word that exists in both decks keeps everything it had.
+    if(DECK&&!confirm(`用《${deck.name}》（${deck.cards.length} 词）替换当前词库吗？\n\n学习记录不会被删除；两边写法完全相同的词会继续沿用原来的进度。`))return;
+    let saved=true;
+    try{await DWDeck.save(deck)}catch(err){saved=false;console.error(err);DWStore.notice("warn",`词库这次没能存到本机（${esc(String(err&&err.message||err))}），本次可以正常使用，刷新后需要重新导入。`)}
+    // A swap mid-session would leave every module holding the old deck; a reload
+    // is the honest way to rebuild all of it.
+    if(DECK&&saved){location.reload();return}
+    applyDeck(deck)
+  }catch(e){console.error(e);const msg=`<b>这个文件没能导入：</b>${esc(String(e&&e.message||e))}`;if(DECK)alert(String(e&&e.message||e));else showGate(msg)}}
+async function loadCards(){try{const deck=await DWDeck.load();if(!deck){showGate();return}applyDeck(deck)}catch(e){console.error(e);showGate(`<b>打不开本机的词库存储：</b>${esc(String(e&&e.message||e))}；你仍然可以导入一份词库临时使用。`)}}
+$("deckDemoBtn").onclick=useStarterDeck;
+$("deckPickBtn").onclick=()=>$("deckFile").click();
+$("deckSwapBtn").onclick=()=>$("deckFile").click();
+$("deckFile").onchange=e=>{const f=e.target.files&&e.target.files[0];e.target.value="";useDeckFile(f)};
+$("deckExportBtn").onclick=()=>{if(!DECK)return;DWStore.downloadText(`${(DECK.name||"deck").replace(/[^\w\u4e00-\u9fa5.-]+/g,"_")}.json`,DWDeck.serialize(DECK))};
+{const z=$("deckDrop");const stop=e=>{e.preventDefault();e.stopPropagation()};
+ ["dragenter","dragover"].forEach(t=>z.addEventListener(t,e=>{stop(e);z.classList.add("over")}));
+ ["dragleave","drop"].forEach(t=>z.addEventListener(t,e=>{stop(e);z.classList.remove("over")}));
+ z.addEventListener("drop",e=>{const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)useDeckFile(f)})}
 $("startBtn").onclick=()=>start(false);$("weakBtn").onclick=()=>start(true);$("resetBtn").onclick=()=>{if(confirm("确定清空本机的「单词检测」记录吗？\n\n背词模式的学习进度不受影响。")){progress={};DWStore.queue(STORE_KEY,()=>progress);DWStore.flush();stats();bank()}};$("submitBtn").onclick=()=>{$("answer").blur();check()};$("showBtn").onclick=()=>{$("answer").blur();reveal(false)};$("nextBtn").onclick=()=>{index++;question();bring(document.querySelector(".quiz"),"start")};$("answer").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();if(answered)$("nextBtn").click();else{$("answer").blur();check()}}});$("level").onchange=chapters;$("chapter").onchange=bank;
 let deferred=null;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;$("installBtn").style.display="";$("appStatus").textContent="可以安装到手机桌面。"});$("installBtn").onclick=async()=>{if(!deferred)return;deferred.prompt();try{await deferred.userChoice}catch(e){}deferred=null;$("installBtn").style.display="none"};window.addEventListener("appinstalled",()=>$("appStatus").textContent="已安装到手机桌面。")
 function dl(name,obj){DWStore.download(name,obj)}$("exportBtn").onclick=()=>DWStore.exportBackup();$("importBtn").onclick=()=>$("fileImport").click();$("fileImport").onchange=async e=>{const f=e.target.files&&e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text()),p=d.quizProgress||d.progress||d;if(!p||typeof p!=="object"||Array.isArray(p))throw 0;progress=mergeProgress(progress,p,"last");DWStore.queue(STORE_KEY,()=>progress);DWStore.flush();stats();alert("学习记录已合并导入。")}catch(err){alert("无法识别这个备份文件。")}e.target.value=""}
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").then(r=>{$("appStatus").textContent="离线模式已启用。";r.update().catch(()=>{})}).catch(()=>{}));
-window.__cardsReady=loadCards();
+loadCards();
 </script>
 <script src="./learn.js"></script>
 </body></html>

@@ -1,7 +1,7 @@
 {
-  "name": "Netzwerk neu A1–B1 单词检测",
+  "name": "Deutsch Wörter",
   "short_name": "Deutsch Wörter",
-  "description": "Netzwerk neu A1–B1 德语词汇检测与错词复习",
+  "description": "导入自己的德语词库，记忆、复习、拼写和错词重练",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
