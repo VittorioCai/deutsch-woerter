@@ -287,3 +287,94 @@ describe('Wikimedia audio addressing', () => {
     expect(md5('De-Würstchen.ogg')).not.toBe(md5('De-Wurstchen.ogg'));
   });
 });
+
+describe('word insight', () => {
+  const DWInsight = load<any>('insight.js', 'DWInsight');
+  const card = (de: string, zh: string, en = '') => ({ de, zh, en, level: 'A1', chapter: '1', grammar: '', example: '' });
+  // A purpose-built miniature deck: the compound rules use whatever deck is
+  // loaded as their dictionary, so the test owns both halves of every compound.
+  const DECK = [
+    card('die Hand', '手'), card('das Tuch', '布'), card('das Handtuch', '毛巾'),
+    card('die Bahn', '铁路'), card('der Hof', '院子'), card('der Bahnhof', '火车站'),
+    card('die Geburt', '出生'), card('der Tag', '天'), card('der Geburtstag', '生日'),
+    card('krank', '生病的'), card('die Schwester', '姐妹'), card('die Krankenschwester', '护士'),
+    card('nach', '之后'), card('die Bar', '酒吧'), card('der Nachbar', '邻居'),
+    card('die Wohnung', '住房'), card('die Prüfung', '考试'), card('die Zeitung', '报纸'),
+    card('die Freiheit', '自由'), card('das Mädchen', '女孩'), card('der Kuchen', '蛋糕'),
+    card('das Haus', '房子'), card('vorstellen', '介绍'), card('verstehen', '理解'),
+    card('arbeitslos', '失业的'), card('der Sprung', '跳跃'),
+  ];
+  const at = (de: string) => DWInsight.Lanalyse(DECK.find((c) => c.de === de), DECK);
+  const text = (de: string) => at(de).map((r: any) => `${r.label}|${r.text}|${r.note ?? ''}`).join('\n');
+
+  it('explains a noun ending in -ung and shows the pattern beside it', () => {
+    const rows = at('die Wohnung');
+    expect(rows.find((r: any) => r.kind === 'gender').text).toMatch(/-ung/);
+    // the point of the family is that the rule stops being a claim
+    expect(rows.find((r: any) => r.kind === 'family').text).toContain('die Prüfung');
+    expect(rows.find((r: any) => r.kind === 'plural').text).toContain('-en');
+  });
+
+  it('never offers a word as evidence for a rule it does not obey', () => {
+    // der Kuchen ends in "chen" without being a diminutive; der Sprung ends in
+    // "ung" without being a noun in -ung.
+    expect(text('das Mädchen')).not.toContain('Kuchen');
+    expect(text('die Wohnung')).not.toContain('Sprung');
+    expect(at('der Kuchen').filter((r: any) => r.kind === 'gender')).toHaveLength(0);
+    expect(at('der Sprung').filter((r: any) => r.kind === 'gender')).toHaveLength(0);
+  });
+
+  it('splits compounds and reads the gender off the last element', () => {
+    expect(text('das Handtuch')).toContain('Hand + Tuch');
+    expect(text('das Handtuch')).toContain('das Tuch');
+    expect(text('der Bahnhof')).toContain('Bahn + Hof');
+    // linking letters are named as such rather than left to look like a typo
+    expect(text('der Geburtstag')).toContain('Geburt +s+ Tag');
+    expect(text('der Geburtstag')).toMatch(/-s- 是连接音/);
+    expect(text('die Krankenschwester')).toContain('krank +en+ Schwester');
+  });
+
+  it('refuses a split that would be nonsense', () => {
+    // "nach + Bar" parses but is not what der Nachbar is made of. A short
+    // function word in front of a three-letter word is the shape of that error.
+    expect(at('der Nachbar')).toEqual([]);
+  });
+
+  it('tells separable and inseparable verb prefixes apart', () => {
+    const sep = at('vorstellen').find((r: any) => r.kind === 'affix');
+    expect(sep.label).toContain('可分');
+    expect(sep.note).toMatch(/甩到句尾/);
+    const insep = at('verstehen').find((r: any) => r.kind === 'affix');
+    expect(insep.label).toContain('不可分');
+    expect(insep.note).toMatch(/ge-/);
+    // a verb is not a noun compound, whatever words happen to be in the deck
+    expect(at('vorstellen').filter((r: any) => r.kind === 'compound')).toHaveLength(0);
+  });
+
+  it('reads adjective suffixes', () => {
+    expect(text('arbeitslos')).toContain('-los');
+  });
+
+  it('says nothing rather than inventing something', () => {
+    // das Haus has no derivable rule behind it. A guess here would be worse than
+    // an empty panel.
+    expect(at('das Haus')).toEqual([]);
+  });
+
+  it('never contradicts the deck it is explaining', () => {
+    // Every gender line must agree with the article the card actually carries;
+    // an explanation that argues with the word teaches the wrong thing.
+    const { cards } = DWDeck.parse(readFileSync(new URL('../src/starter-deck.json', import.meta.url), 'utf8'), 's.json');
+    let explained = 0;
+    for (const c of cards) {
+      for (const row of DWInsight.Lanalyse(c, cards)) {
+        if (row.kind !== 'gender') continue;
+        explained++;
+        expect(row.label, c.de).toContain(c.de.split(' ')[0]);
+      }
+    }
+    // The deck the app ships must actually exercise the feature it ships: a
+    // first-time visitor who never sees the panel does not know it exists.
+    expect(explained).toBeGreaterThan(25);
+  });
+});
