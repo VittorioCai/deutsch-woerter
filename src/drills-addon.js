@@ -36,7 +36,9 @@ function LpluralOf(c) {
   const explicit = raw.match(/^Plural:\s*(?:die\s+)?(.+)$/i);
   if (explicit) {
     const form = explicit[1].trim();
-    return /^[A-Za-zÄÖÜäöüß][\wÄÖÜäöüß-]*$/.test(form) ? `die ${form}` : null;
+    // Accented letters appear in loanwords the deck legitimately contains
+    // (die Cafés, die Menus). Rejecting them cost those nouns their drill.
+    return /^\p{L}[^\s\d|/,;()]*$/u.test(form) ? `die ${form}` : null;
   }
   const short = raw.match(/^(["*]*)-?(n|en|nen|e|er|s|se|ien|es|€)?$/);
   if (!short) return null;

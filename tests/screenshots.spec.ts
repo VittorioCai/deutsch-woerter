@@ -59,6 +59,20 @@ test('capture the README screenshots', async ({ page }) => {
   await page.waitForSelector('#learnBody .learnWord');
   await page.locator('#learnCard').screenshot({ path: `${OUT}/03-learn.png` });
 
+  // A card whose word the rules have something to say about.
+  await page.locator('#modeBack').click();
+  await page.locator('#goLearn').click();
+  await page.selectOption('#learnLevel', 'A2');
+  await page.selectOption('#learnChapter', '6');
+  await page.locator('#learnStartBtn').click();
+  await page.waitForSelector('.insightBox');
+  await page.locator('#learnCard').screenshot({ path: `${OUT}/07-insight.png` });
+  for (let i = 0; i < 3 && !(await page.locator('.insightBox').innerText()).includes('拆开看'); i++) {
+    await page.locator('#learnRemember').click();
+    await page.waitForSelector('.insightBox');
+  }
+  await page.locator('#learnCard').screenshot({ path: `${OUT}/08-compound.png` });
+
   for (let i = 0; i < 6 && !(await page.locator('#learnBody .choice').count()); i++) {
     await page.locator('#learnRemember').click();
   }

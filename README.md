@@ -25,7 +25,7 @@
 <td width="50%"><img src="docs/screenshots/02-home.png" alt="Home screen"><br><sub><b>One button a day.</b> Everything due for review across every chapter, plus a few new words.</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="docs/screenshots/03-learn.png" alt="Learning a word"><br><sub><b>Four stages per word.</b> Meet it, recognise it, recall it, spell it — with recorded native audio.</sub></td>
+<td width="50%"><img src="docs/screenshots/08-compound.png" alt="A word explained"><br><sub><b>Why the word is what it is.</b> Gender from the ending, compounds taken apart, plurals derived — computed from the word, for any deck.</sub></td>
 <td width="50%"><img src="docs/screenshots/05-drill.png" alt="Gender drill"><br><sub><b>Drills for what spelling checks miss:</b> der/die/das, plural forms, dictation.</sub></td>
 </tr>
 </table>
@@ -62,6 +62,14 @@ starter deck written for this project, so the app is useful the second you open 
   so it stops picking the robotic compact one.
 - **A wrong-book that explains itself.** Missed spellings are grouped by *why* —
   missing umlaut, wrong article, near-miss — not just listed.
+- **Explanations, not just answers.** German gender is largely predictable from
+  the ending, a compound takes the gender and plural of its last element, and verb
+  prefixes carry meaning — so the app *derives* the explanation from the word
+  rather than storing one next to it. `die Wohnung` gets "-ung is feminine,
+  plural -en, and here are four more"; `das Kinderzimmer` gets taken apart into
+  Kind +er+ Zimmer with its gender read off `das Zimmer`. It costs no bytes, works
+  offline, and works on **any** deck you import — not only on words somebody
+  pre-wrote.
 - **Installable and offline.** Add it to the home screen; it works on a plane.
 
 ## Bring your own word list
@@ -147,7 +155,7 @@ written to `dist/`. It runs as part of `npm run dev`, `npm test` and
 | Edit | Generated into `dist/` |
 | --- | --- |
 | `src/index.html`, `learn.css`, `icon.svg`, `app.webmanifest`, `starter-deck.json` | copied as-is |
-| `src/learn.core.js`, `wrongbook-addon.js`, `mastered-addon.js`, `drills-addon.js`, `md5.js` | `learn.js` |
+| `src/learn.core.js`, `insight.js`, `wrongbook-addon.js`, `mastered-addon.js`, `drills-addon.js`, `md5.js` | `learn.js` |
 | `src/store.js` | `store.js` |
 | `src/deck.js` | `deck.js` |
 | `src/sw.source.js` | `sw.js` |
@@ -156,6 +164,12 @@ written to `dist/`. It runs as part of `npm run dev`, `npm test` and
 anything that reads its own state back must keep an in-memory copy and merge into
 that — re-reading storage inside a flush window sees a stale value and silently
 drops the pending change.
+
+`src/insight.js` holds the explanation rules. Only near-exceptionless ones are
+stated as facts, the words that merely *end* in those letters are listed out by
+hand, and when nothing solid applies it returns nothing: an invented explanation
+is worse than a blank panel. It never contradicts the deck — a rule that
+disagrees with the article the card carries stays silent, and a test enforces it.
 
 `src/deck.js` owns the word list: parsing, the card ids, IndexedDB. It implements
 SHA-256 by hand rather than calling `crypto.subtle`, which is unavailable outside a

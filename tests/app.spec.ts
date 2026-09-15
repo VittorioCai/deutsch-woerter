@@ -986,3 +986,58 @@ test('the demo deck is one click away and is a working app, not a sample', async
   await ready(page);
   await expect(page.locator('#deckGate')).toBeHidden();
 });
+
+test('the learning card explains why the word is what it is', async ({ page }) => {
+  await page.goto(APP);
+  await page.locator('#deckDemoBtn').click();
+  await ready(page);
+  await page.locator('#goLearn').click();
+  await page.selectOption('#learnLevel', 'A2');
+  await page.selectOption('#learnChapter', '6');
+  await page.selectOption('#learnCount', '10');
+  await page.locator('#learnStartBtn').click();
+  await expect(page.locator('#learnBody .learnWord')).toBeVisible();
+
+  // Walk the session and collect every explanation shown along the way.
+  const seen: string[] = [];
+  for (let i = 0; i < 40; i++) {
+    if (await page.locator('.insightBox').count()) seen.push(await page.locator('.insightBox').innerText());
+    if (await page.locator('#learnRemember').count()) { await page.locator('#learnRemember').click(); continue }
+    if (await page.locator('#learnBody .choice').count()) {
+      await page.locator('#learnBody .choice').first().click();
+      await page.locator('#learnNextBtn').click();
+      continue;
+    }
+    if (await page.locator('#learnAnswer').count()) {
+      await page.locator('#learnAnswer').fill('zzz');
+      await page.locator('#learnSubmit').click();
+      await page.locator('#learnNextBtn').click();
+      continue;
+    }
+    break;
+  }
+  const all = seen.join('\n');
+  // gender derived from an ending, a compound taken apart, and a separable verb
+  expect(all, '巧记面板一次都没出现').not.toBe('');
+  expect(all).toMatch(/为什么是 (der|die|das)/);
+  expect(all).toMatch(/拆开看|可分动词|不可分前缀/);
+});
+
+test('an explanation never argues with the word it explains', async ({ page }) => {
+  // Every gender line must name the article the card actually carries. A panel
+  // that says "为什么是 die" under a der-word teaches the error it is meant to fix.
+  await page.goto(APP);
+  await page.locator('#deckDemoBtn').click();
+  await ready(page);
+  const bad = await page.evaluate(() => {
+    const cards = (window as any).__deck.cards;
+    const out: string[] = [];
+    for (const c of cards) {
+      for (const row of (window as any).DWInsight.Lanalyse(c, cards)) {
+        if (row.kind === 'gender' && !row.label.includes(c.de.split(' ')[0])) out.push(`${c.de}: ${row.label}`);
+      }
+    }
+    return out;
+  });
+  expect(bad).toEqual([]);
+});

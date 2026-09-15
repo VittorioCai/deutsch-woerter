@@ -23,7 +23,7 @@
 <td width="50%"><img src="docs/screenshots/02-home.png" alt="首页"><br><sub><b>每天只需要点一个按钮。</b>跨章节的所有到期复习，加上几个新词。</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="docs/screenshots/03-learn.png" alt="学新词"><br><sub><b>一个词走四层。</b>认识 → 认意思 → 认德语 → 拼写，配德语母语者录音。</sub></td>
+<td width="50%"><img src="docs/screenshots/08-compound.png" alt="巧记"><br><sub><b>告诉你为什么。</b>性别看词尾、复合词拆开看、复数自动推 —— 当场算出来，对任何词库都生效。</sub></td>
 <td width="50%"><img src="docs/screenshots/05-drill.png" alt="专项训练"><br><sub><b>练拼写查不出来的东西：</b>der/die/das、复数形式、听写。</sub></td>
 </tr>
 </table>
@@ -49,6 +49,11 @@
   的母语者录音（常用词命中率约九成），听过一次就缓存；没有录音的用设备上最好的德语语音 ——
   系统会给语音排序，不会再默认挑那个最机械的 compact 版。
 - **会解释的错题本。** 拼错的词按**错因**分组 —— 变音漏写、冠词错、拼写接近 —— 而不是列一堆词让你自己看。
+- **巧记：不只给答案，还告诉你为什么。** 德语的性别大量可以从词尾推，复合词跟最后一节走，
+  动词前缀自带含义 —— 所以这些解析是从单词**当场算出来**的，不是预先写好存在旁边的。
+  `die Wohnung` 会告诉你「-ung 结尾是阴性、复数 -en、还有这四个同类词」；
+  `das Kinderzimmer` 会被拆成 Kind +er+ Zimmer，性别从 `das Zimmer` 读出来。
+  不占体积、离线可用，而且对**你导入的任何词库**都生效，不是只对别人写好的那些词生效。
 - **可安装、可离线。** 添加到主屏幕，飞机上也能背。
 
 ## 导入你自己的词库
@@ -123,7 +128,7 @@ Wikimedia 是打桩的，因为一个"在不同机器上悄悄测了不同东西
 | 改这里 | 生成到 `dist/` |
 | --- | --- |
 | `src/index.html`、`learn.css`、`icon.svg`、`app.webmanifest`、`starter-deck.json` | 原样复制 |
-| `src/learn.core.js`、`wrongbook-addon.js`、`mastered-addon.js`、`drills-addon.js`、`md5.js` | `learn.js` |
+| `src/learn.core.js`、`insight.js`、`wrongbook-addon.js`、`mastered-addon.js`、`drills-addon.js`、`md5.js` | `learn.js` |
 | `src/store.js` | `store.js` |
 | `src/deck.js` | `deck.js` |
 | `src/sw.source.js` | `sw.js` |
@@ -131,6 +136,11 @@ Wikimedia 是打桩的，因为一个"在不同机器上悄悄测了不同东西
 `src/store.js` 独占所有对 `localStorage` 的读写。写入是批量的，所以任何需要读回自己状态的代码
 都必须在内存里保留一份并合并进去 —— 在一个 flush 窗口内重新读存储会拿到过期值，
 然后悄悄把待写入的改动覆盖掉。
+
+`src/insight.js` 是巧记的规则表。只有几乎无例外的规则才会被当作事实说出来，
+那些仅仅是"恰好以这几个字母结尾"的词逐个列在例外里；没有把握时它什么都不说 ——
+编一个解释比空面板更糟。它也永远不会和词库矛盾：规则算出来的性别跟卡片上的冠词不一致时就闭嘴，
+这一条有测试守着。
 
 `src/deck.js` 负责词库：解析、卡片 id、IndexedDB。SHA-256 是手写的，没有用 `crypto.subtle` ——
 后者在非安全上下文里根本不存在，而且是异步的；这串数字是你的进度找到对应单词的唯一依据，
