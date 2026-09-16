@@ -10,6 +10,7 @@ const QUIZ_KEY = 'netzwerk_vocab_progress_pwa_v1';
 const LEARN_KEY = 'netzwerk_vocab_learning_v1';
 const WRONG_KEY = 'netzwerk_vocab_spelling_wrongbook_v1';
 const SCHEMA_KEY = 'netzwerk_vocab_schema';
+const PREFS_KEY = 'netzwerk_vocab_prefs_v1';
 
 // The app ships with no vocabulary of its own, so every test brings its own deck.
 // It is a small, made-up word list rather than a copy of anyone's textbook, and
@@ -1227,4 +1228,108 @@ test('an explanation never argues with the word it explains', async ({ page }) =
     return out;
   });
   expect(bad).toEqual([]);
+});
+
+test('the home screen asks where you are before it hands out A1 Kapitel 1', async ({ page }) => {
+  await open(page);
+  // Nothing stored yet: the bar asks rather than silently starting at the front.
+  await expect(page.locator('#posBar')).toContainText('你已经学到哪一章了');
+  await page.locator('#posEdit').click();
+  await expect(page.locator('#browseOverlay')).toBeVisible();
+
+  // The map is the empty state of the search sheet, one tile per Kapitel.
+  await expect(page.locator('.mapTile')).toHaveCount(6);
+  await page.locator('.mapTile', { hasText: 'Kapitel 4' }).first().click();
+  await expect(page.locator('.mapActions')).toContainText('A1 Kapitel 4');
+  await page.locator('#mapStartHere').click();
+  await page.locator('#browseClose').click();
+
+  await expect(page.locator('#posBar')).toContainText('学到 A1 Kapitel 4');
+
+  // And the daily plan actually moves: the new words now come from Kapitel 4,
+  // not from the Hallo/danke at the top of the file.
+  await page.locator('#goToday').click();
+  await expect(page.locator('#learnCard')).toBeVisible();
+  const chapters = new Set<string>();
+  const cards = await deck(page);
+  const byDe = new Map(cards.map((c) => [c.de, `${c.level}K${c.chapter}`]));
+  for (let i = 0; i < 4; i++) {
+    const word = (await page.locator('#learnBody .learnWord').first().textContent())!.trim();
+    if (byDe.has(word)) chapters.add(byDe.get(word)!);
+    await page.locator('#learnRemember').click();
+  }
+  expect([...chapters]).toEqual(['A1K4']);
+});
+
+test('the position moves on by itself when a Kapitel runs out', async ({ page }) => {
+  await open(page);
+  const cards = await deck(page);
+  const k4 = cards.filter((c) => c.level === 'A1' && c.chapter === '4').map((c) => c.id);
+  await page.evaluate(([learnKey, schemaKey, prefsKey, ids]) => {
+    const learn: Record<string, unknown> = {};
+    for (const id of ids as string[]) {
+      learn[id] = { introduced: true, strength: 3, wrong: 0, hard: 0, last: 1, due: Date.now() + 8.64e7, spellingPass: false, cycles: 1, known: false };
+    }
+    localStorage.setItem(learnKey as string, JSON.stringify(learn));
+    localStorage.setItem(schemaKey as string, '2');
+    localStorage.setItem(prefsKey as string, JSON.stringify({ posLevel: 'A1', posChapter: '4' }));
+  }, [LEARN_KEY, SCHEMA_KEY, PREFS_KEY, k4] as const);
+  await page.reload();
+  await ready(page);
+  // A1 Kapitel 4 has nothing new left, so the bar reads the next Kapitel that
+  // does — without anybody having to go and change it by hand.
+  await expect(page.locator('#posBar')).toContainText('学到 A2 Kapitel 1');
+});
+
+test('a word can be looked up by German, by Chinese, and without its umlaut', async ({ page }) => {
+  await open(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#learnBrowseBtn').click();
+  await expect(page.locator('#browseOverlay')).toBeVisible();
+
+  await page.locator('#browseInput').fill('Blume');
+  await expect(page.locator('.browseItem')).toHaveCount(1);
+  await expect(page.locator('.browseItem').first()).toContainText('die Blume');
+  // The result says where the word lives and whether it has been met yet —
+  // the two things you open a search for.
+  await expect(page.locator('.browseItem').first()).toContainText('Kapitel 4');
+  await expect(page.locator('.browseItem .browseTag').first()).toHaveText('还没学');
+
+  await page.locator('#browseInput').fill('花');
+  await expect(page.locator('.browseItem').first()).toContainText('die Blume');
+
+  await page.locator('#browseInput').fill('tur');
+  await expect(page.locator('.browseItem').first()).toContainText('die Tür');
+
+  await page.locator('#browseInput').fill('Fahrrad');
+  await expect(page.locator('.browseEmpty')).toContainText('词库里没有');
+
+  // Emptying the box returns to the map rather than to a blank sheet.
+  await page.locator('#browseInput').fill('');
+  await expect(page.locator('.mapTile').first()).toBeVisible();
+});
+
+test('a whole Kapitel can be marked known without clicking through it', async ({ page }) => {
+  await open(page);
+  page.on('dialog', (d) => d.accept());
+  await page.locator('#goLearn').click();
+  await page.locator('#learnBrowseBtn').click();
+  await page.locator('.mapTile', { hasText: 'Kapitel 2' }).first().click();
+  await expect(page.locator('.mapActions')).toContainText('A1 Kapitel 2');
+  await page.locator('#mapKnowThis').click();
+
+  // All six words of the Kapitel are known, and their spot checks are fanned out
+  // across the 30–90 day window instead of all landing on one morning.
+  const cards = await deck(page);
+  const ids = cards.filter((c) => c.level === 'A1' && c.chapter === '2').map((c) => c.id);
+  const dues = await page.evaluate(([key, ids]) => {
+    const learn = JSON.parse(localStorage.getItem(key as string) || '{}');
+    return (ids as string[]).map((id) => (learn[id] ? { known: learn[id].known, due: learn[id].due } : null));
+  }, [LEARN_KEY, ids] as const);
+  expect(dues.every((d) => d && d.known === true)).toBe(true);
+  const spread = Math.max(...dues.map((d) => d!.due)) - Math.min(...dues.map((d) => d!.due));
+  expect(spread).toBeGreaterThan(30 * 24 * 60 * 60 * 1000);
+
+  // And they stop being offered as new words.
+  await expect(page.locator('.mapTile', { hasText: 'Kapitel 2' }).first()).toContainText('6/6 学过');
 });

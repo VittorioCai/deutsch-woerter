@@ -659,3 +659,167 @@ describe('a chapter-specific sense', () => {
     expect(new Set([cards[0], ...picked].map(LoptionEn)).size).toBe(4);
   });
 });
+
+// Five thousand words in file order is not a curriculum. The daily plan handed
+// out the first unlearned words it found, so somebody halfway through A2 was fed
+// A1 Kapitel 1 every morning; and there was no way to look a word up at all.
+describe('where you are in a deck this size', () => {
+  type Row = { id: string; level: string; chapter: string; de: string; zh?: string; en?: string; grammar?: string };
+  const documentStub = { addEventListener: () => {}, getElementById: () => null };
+  type Progress = Record<string, { introduced?: boolean; known?: boolean; cycles?: number; strength?: number; spellingPass?: boolean; due?: number }>;
+  type Group = { level: string; chapter: string; cards: Row[] };
+
+  const learnAt = (cards: Row[], prefs: Record<string, unknown> = {}, progress: Progress = {}) =>
+    load<{
+      LfreshCards(n: number): Row[];
+      LchapGroups(): Group[];
+      LposGroup(): Group | null;
+      LposIndex(): number;
+      Lunlearned(c: Row): boolean;
+      Lstate(c: Row): Record<string, unknown>;
+      Lmastered(s: Record<string, unknown>): boolean;
+    }>('learn.core.js',
+      '{ LfreshCards, LchapGroups, LposGroup, LposIndex, Lunlearned, Lstate, Lmastered }',
+      {
+        DWStore: { KEYS: { LEARN: 'l' }, read: () => progress, onMigrated: () => {}, prefs: () => prefs, queue: () => {} },
+        document: documentStub,
+        CARDS: cards,
+      });
+
+  // Written so a chapter's words are findable by name: the Kapitel a word lands
+  // in is the whole point of every assertion below.
+  const word = (level: string, chapter: string, de: string): Row =>
+    ({ id: `${level}-${chapter}-${de}`, level, chapter, de, zh: de, en: de });
+  const DECK: Row[] = [
+    word('A1', '1', 'Hallo'), word('A1', '1', 'danke'),
+    word('A2', '7', 'die Rechnung'), word('A2', '7', 'aufstehen'),
+    word('A1', '2', 'das Haus'),
+    word('A2', '8', 'die Meinung'),
+    word('B1', '1', 'verschwinden'),
+  ];
+  const learnt = { introduced: true, cycles: 1, strength: 2, due: 0 };
+
+  it('orders the deck by level and Kapitel, not by where the rows happen to sit', () => {
+    // A1 Kapitel 2 is written after A2 Kapitel 7 in this file, as chapters added
+    // later always are. Reading position off file order would step over it.
+    const g = learnAt(DECK).LchapGroups();
+    expect(g.map((x) => `${x.level}K${x.chapter}`)).toEqual(['A1K1', 'A1K2', 'A2K7', 'A2K8', 'B1K1']);
+  });
+
+  it('starts the new words at the Kapitel you said you were on', () => {
+    const l = learnAt(DECK, { posLevel: 'A2', posChapter: '7' });
+    expect(l.LfreshCards(3).map((c) => c.de)).toEqual(['die Rechnung', 'aufstehen', 'die Meinung']);
+  });
+
+  it('still starts at the beginning when nobody has said where they are', () => {
+    // The position is new; every existing install has none, and must behave as
+    // it did yesterday rather than silently jumping somewhere.
+    expect(learnAt(DECK).LfreshCards(2).map((c) => c.de)).toEqual(['Hallo', 'danke']);
+  });
+
+  it('moves on by itself once the Kapitel you are on is finished', () => {
+    const done: Progress = { 'A2-7-die Rechnung': { ...learnt }, 'A2-7-aufstehen': { ...learnt } };
+    const l = learnAt(DECK, { posLevel: 'A2', posChapter: '7' }, done);
+    const g = l.LposGroup();
+    expect(`${g!.level}K${g!.chapter}`).toBe('A2K8');
+    expect(l.LfreshCards(1).map((c) => c.de)).toEqual(['die Meinung']);
+  });
+
+  it('goes back for what was stepped over, but only once nothing is left ahead', () => {
+    const ahead: Progress = {
+      'A2-7-die Rechnung': { ...learnt }, 'A2-7-aufstehen': { ...learnt },
+      'A2-8-die Meinung': { ...learnt }, 'B1-1-verschwinden': { ...learnt },
+    };
+    // A1 was skipped over when the position was set; reporting the deck finished
+    // while those words sit unlearned would be a lie.
+    expect(learnAt(DECK, { posLevel: 'A2', posChapter: '7' }, ahead).LfreshCards(5).map((c) => c.de))
+      .toEqual(['Hallo', 'danke', 'das Haus']);
+  });
+
+  it('treats a word waved through as learnt, not as new', () => {
+    const waved: Progress = { 'A2-7-die Rechnung': { introduced: true, known: true } };
+    const l = learnAt(DECK, { posLevel: 'A2', posChapter: '7' }, waved);
+    expect(l.LfreshCards(2).map((c) => c.de)).toEqual(['aufstehen', 'die Meinung']);
+    expect(l.Lmastered(l.Lstate(DECK[2]))).toBe(true);
+  });
+
+  it('reports no position rather than guessing one when the Kapitel is gone', () => {
+    // Swapping in a deck that has no A2 Kapitel 7 must not leave the plan stuck.
+    const l = learnAt(DECK, { posLevel: 'A2', posChapter: '99' });
+    expect(l.LposIndex()).toBe(-1);
+    expect(l.LfreshCards(1).map((c) => c.de)).toEqual(['Hallo']);
+  });
+});
+
+describe('finding one word among five thousand', () => {
+  type Row = { id: string; level: string; chapter: string; de: string; zh?: string; en?: string; grammar?: string };
+  const documentStub = { addEventListener: () => {}, getElementById: () => null };
+  const DECK: Row[] = [
+    { id: '1', level: 'A1', chapter: '1', de: 'die Tür', zh: '门', en: 'door' },
+    { id: '2', level: 'A1', chapter: '2', de: 'der Bruder', zh: '哥哥；弟弟', en: 'brother' },
+    { id: '3', level: 'A2', chapter: '6', de: 'die Rechnung', zh: '账单', en: 'bill, invoice', grammar: 'Plural: die Rechnungen' },
+    { id: '4', level: 'A2', chapter: '6', de: 'rechnen', zh: '计算', en: 'to calculate' },
+    { id: '5', level: 'B1', chapter: '1', de: 'die Tüte', zh: '袋子', en: 'bag' },
+  ];
+  // The same 这里：-stripping the options use, so a chapter note never decides
+  // which search result comes first.
+  const senseFree = load<(s: string) => string>('learn.core.js', 'LsenseFree',
+    { DWStore: { KEYS: { LEARN: 'l' }, read: () => ({}), onMigrated: () => {}, prefs: () => ({}), queue: () => {} }, document: documentStub });
+  const browse = load<{
+    LbrowseFind(q: string): Row[];
+    LfoldBase(s: string): string;
+    LfoldAe(s: string): string;
+  }>('browse-addon.js', '{ LbrowseFind, LfoldBase, LfoldAe }',
+    { document: documentStub, LallLearningCards: () => DECK, LsenseFree: senseFree });
+
+  it('finds a word by its German, its Chinese or its English', () => {
+    expect(browse.LbrowseFind('Rechnung').map((c) => c.id)).toEqual(['3']);
+    expect(browse.LbrowseFind('账单').map((c) => c.id)).toEqual(['3']);
+    expect(browse.LbrowseFind('invoice').map((c) => c.id)).toEqual(['3']);
+  });
+
+  it('finds an umlaut from a keyboard that has none, spelled either way', () => {
+    // Nobody types ü on a phone in a hurry. Both conventions have to land.
+    expect(browse.LbrowseFind('tur').map((c) => c.de)).toEqual(['die Tür']);
+    expect(browse.LbrowseFind('tuer').map((c) => c.de)).toEqual(['die Tür']);
+    expect(browse.LbrowseFind('Tür').map((c) => c.de)).toEqual(['die Tür']);
+  });
+
+  it('does not read an honest ue as an umlaut', () => {
+    // Folding the query instead of the deck would turn `Bruder` into `Brder`
+    // and lose it — so the deck is folded both ways and the query left alone.
+    expect(browse.LbrowseFind('bruder').map((c) => c.id)).toEqual(['2']);
+    expect(browse.LfoldBase('der Bruder')).toBe('der bruder');
+    expect(browse.LfoldAe('die Tür')).toBe('die tuer');
+  });
+
+  it('puts the word you typed above the words that merely contain it', () => {
+    expect(browse.LbrowseFind('rechnen')[0].de).toBe('rechnen');
+    expect(browse.LbrowseFind('rechn').map((c) => c.de)).toEqual(['die Rechnung', 'rechnen']);
+  });
+
+  it('ranks an exact Chinese sense above a word that merely contains it', () => {
+    // 花 is 花园's first character. Ranking German alone left 花园 on top, which
+    // is the wrong answer to a one-character query.
+    const withGarden = [...DECK, { id: '6', level: 'A1', chapter: '1', de: 'der Garten', zh: '花园', en: 'garden' },
+      { id: '7', level: 'A1', chapter: '4', de: 'die Blume', zh: '花', en: 'flower' }];
+    const b = load<{ LbrowseFind(q: string): Row[] }>('browse-addon.js', '{ LbrowseFind }',
+      { document: documentStub, LallLearningCards: () => withGarden, LsenseFree: senseFree });
+    expect(b.LbrowseFind('花').map((c) => c.de)).toEqual(['die Blume', 'der Garten']);
+  });
+
+  it('does not let a 这里： note decide the ranking', () => {
+    const sensed = [{ id: '8', level: 'A1', chapter: '1', de: 'gut', zh: '好；好的', en: 'good' },
+      { id: '9', level: 'A1', chapter: '4', de: 'gut', zh: '这里：好的；没问题', en: 'hier: okay' }];
+    const b = load<{ LbrowseFind(q: string): Row[] }>('browse-addon.js', '{ LbrowseFind }',
+      { document: documentStub, LallLearningCards: () => sensed, LsenseFree: senseFree });
+    // Both are exact hits on 好的; neither is demoted for carrying the prefix.
+    expect(b.LbrowseFind('好的').map((c) => c.id)).toEqual(['8', '9']);
+  });
+
+  it('searches the word-form column too, and says nothing when there is nothing', () => {
+    expect(browse.LbrowseFind('Rechnungen').map((c) => c.id)).toEqual(['3']);
+    expect(browse.LbrowseFind('Fahrrad')).toEqual([]);
+    expect(browse.LbrowseFind('   ')).toEqual([]);
+  });
+});

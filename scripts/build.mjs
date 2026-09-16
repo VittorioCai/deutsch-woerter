@@ -20,7 +20,7 @@ for (const name of STATIC) copyFileSync(new URL(name, src), new URL(name, out));
 const read = (name) => readFileSync(new URL(name, src), 'utf8').trim();
 writeFileSync(
   new URL('learn.js', out),
-  `(()=>{\n${read('md5.js')}\n${read('insight.js')}\n${read('learn.core.js')}\n${read('wrongbook-addon.js')}\n${read('mastered-addon.js')}\n${read('drills-addon.js')}\nLboot();\n})();\n`,
+  `(()=>{\n${read('md5.js')}\n${read('insight.js')}\n${read('learn.core.js')}\n${read('wrongbook-addon.js')}\n${read('mastered-addon.js')}\n${read('drills-addon.js')}\n${read('browse-addon.js')}\nLboot();\n})();\n`,
 );
 writeFileSync(new URL('store.js', out), `${read('store.js')}\n`);
 writeFileSync(new URL('deck.js', out), `${read('deck.js')}\n`);
