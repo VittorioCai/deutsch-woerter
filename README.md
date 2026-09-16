@@ -46,7 +46,9 @@ starter deck written for this project, so the app is useful the second you open 
 - **今日任务 — the daily button.** Everything due for review across all chapters
   plus a few new words, in one session. Spaced repetition is supposed to decide
   what you study; the chapter pickers are there when you want them, not on the
-  daily path.
+  daily path. Words you have already mastered come back for the occasional spot
+  check too — answering right three times is not the same as knowing a word a
+  year later.
 - **学新词 — staged learning.** Meet the word → recognise its meaning → recall the
   German → spell it, with spaced review in between. Spelling can be switched off
   for a recognition-only session; those words still advance through the review
@@ -55,7 +57,9 @@ starter deck written for this project, so the app is useful the second you open 
 - **单词检测 — the quiz.** Weak words first, both directions, spelling checked,
   articles optional or strict.
 - **专项训练 — targeted drills.** der/die/das, plural forms derived from the grammar
-  column, and dictation. These test the things a spelling check quietly accepts.
+  column, whether the perfect takes haben or sein, filling a word back into its own
+  example sentence, and dictation. These test the things a spelling check quietly
+  accepts, and every question is computed from the word list you imported.
 - **Real pronunciation.** Native recordings from [Wikimedia
   Commons](https://commons.wikimedia.org/) where they exist (~90% of common words),
   cached after first play; otherwise the best German voice the device has, ranked

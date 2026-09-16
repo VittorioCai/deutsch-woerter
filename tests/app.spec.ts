@@ -331,6 +331,38 @@ test('today card clears due words across chapters in one session', async ({ page
   expect(total).toBeGreaterThanOrEqual(36);
 });
 
+test('a mastered word comes back for a spot check instead of vanishing', async ({ page }) => {
+  await open(page);
+  const cards = await deck(page);
+  const ids = cards.filter((c) => c.level === 'A1' && String(c.chapter) === '1').slice(0, 3).map((c) => c.id);
+  await page.evaluate(([learnKey, schemaKey, ids]) => {
+    const learn: Record<string, unknown> = {};
+    // exactly what 「这个我已经会」 leaves behind, with its interval elapsed
+    for (const id of ids as string[]) {
+      learn[id] = { introduced: true, strength: 5, wrong: 0, hard: 0, last: 1, due: 1, spellingPass: true, cycles: 3, known: true };
+    }
+    localStorage.setItem(learnKey as string, JSON.stringify(learn));
+    localStorage.setItem(schemaKey as string, '2');
+  }, [LEARN_KEY, SCHEMA_KEY, ids] as const);
+  await page.reload();
+  await ready(page);
+
+  await expect(page.locator('#homeMastered')).toHaveText('3');
+  // these used to be gone for good; the daily session now checks a few
+  await expect(page.locator('#todayBreak')).toContainText('3 个已掌握抽查');
+  await page.locator('#goToday').click();
+  await expect(page.locator('#learnBadge')).toContainText('已掌握抽查');
+  await expect(page.locator('#learnAnswer')).toBeVisible();
+
+  // and a missed check puts the word back into learning rather than leaving the
+  // claim standing
+  await page.locator('#learnAnswer').fill('nichtdaswort');
+  await page.locator('#learnSubmit').click();
+  await expect(page.locator('#learnFeedback')).toContainText('这次先记住它');
+  await page.locator('#modeBack').click();
+  await expect(page.locator('#homeMastered')).toHaveText('2');
+});
+
 test('gender drill asks for der/die/das and scores per article', async ({ page }) => {
   await open(page);
   await page.locator('#goLearn').click();

@@ -505,3 +505,89 @@ describe('what the grammar and example columns encode', () => {
     });
   });
 });
+
+// Scheduling is the whole product: a word that comes back too late is forgotten
+// and one that never comes back was never really learnt.
+describe('when a word comes back', () => {
+  const documentStub = { addEventListener: () => {} };
+  type S = Record<string, unknown>;
+  const srs = (progress: Record<string, S> = {}, cards: unknown[] = []) =>
+    load<{
+      Linterval(s: S): number;
+      Lmastered(s: S): boolean;
+      LspotCards(n: number): Array<{ id: string }>;
+      LdueCards(): Array<{ id: string }>;
+      LtomorrowCount(): number;
+    }>('learn.core.js', '{ Linterval, Lmastered, LspotCards, LdueCards, LtomorrowCount }', {
+      DWStore: { KEYS: { LEARN: 'l' }, read: () => progress, onMigrated: () => {}, prefs: () => ({}), queue: () => {} },
+      document: documentStub,
+      CARDS: cards,
+    });
+
+  const DAY = 24 * 60 * 60 * 1000;
+  const card = (id: string) => ({ id, level: 'A1', chapter: '1', de: id });
+  const mastered = (due: number, extra: S = {}) =>
+    ({ introduced: true, strength: 5, cycles: 3, spellingPass: true, known: false, due, ...extra });
+
+  it('keeps stretching the gap past the fortnight it used to stop at', () => {
+    const { Linterval } = srs();
+    const at = (cycles: number) => Linterval({ cycles, spellingPass: true, hard: 0 });
+    expect(at(0)).toBe(10 * 60 * 1000);
+    expect(at(1)).toBe(DAY);
+    expect(at(2)).toBe(3 * DAY);
+    expect(at(3)).toBe(14 * DAY);
+    // A deck that takes a year to work through needs the far end of the ladder;
+    // it used to flatten out here and the word was dropped instead.
+    expect(at(4)).toBe(30 * DAY);
+    expect(at(5)).toBe(90 * DAY);
+    expect(at(12)).toBe(90 * DAY);
+  });
+
+  it('brings a word flagged 很难记 back in half the time', () => {
+    const { Linterval } = srs();
+    // the flag was written on every card and read by nothing
+    expect(Linterval({ cycles: 2, hard: 1, spellingPass: false })).toBe(1.5 * DAY);
+    expect(Linterval({ cycles: 3, hard: 2, spellingPass: false })).toBe(7 * DAY);
+    // and it stops shortening once the word has been written from memory
+    expect(Linterval({ cycles: 2, hard: 1, spellingPass: true })).toBe(3 * DAY);
+    // never below the within-session floor
+    expect(Linterval({ cycles: 0, hard: 3, spellingPass: false })).toBe(10 * 60 * 1000);
+  });
+
+  it('brings a mastered word back once its interval is up, oldest first', () => {
+    const now = Date.now();
+    const { LspotCards, LdueCards } = srs(
+      { a: mastered(now - DAY), b: mastered(now + 30 * DAY), c: mastered(now - 2 * DAY) },
+      ['a', 'b', 'c'].map(card));
+    expect(LspotCards(5).map((c) => c.id)).toEqual(['c', 'a']);
+    // and never through the ordinary queue, which is for words still being learnt
+    expect(LdueCards()).toEqual([]);
+  });
+
+  it('caps a day’s spot checks so they cannot crowd out the actual review', () => {
+    const now = Date.now();
+    const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+    const progress = Object.fromEntries(ids.map((id, i) => [id, mastered(now - (i + 1) * DAY)]));
+    expect(srs(progress, ids.map(card)).LspotCards(5)).toHaveLength(5);
+  });
+
+  it('checks a word claimed with 这个我已经会 rather than taking its word for it', () => {
+    const now = Date.now();
+    // That button set a due date 30 days out and Lmastered ignored it, so the
+    // claim was never tested: clicking it simply deleted the word from the app.
+    const claimed = mastered(now - 1, { known: true });
+    const { Lmastered, LspotCards } = srs({ a: claimed }, [card('a')]);
+    expect(Lmastered(claimed)).toBe(true);
+    expect(LspotCards(5).map((c) => c.id)).toEqual(['a']);
+  });
+
+  it('counts tomorrow, so an empty today does not read as an empty deck', () => {
+    const now = Date.now();
+    const { LtomorrowCount } = srs({
+      a: { introduced: true, due: now + 2 * 60 * 60 * 1000 },
+      b: { introduced: true, due: now + 5 * DAY },
+      c: { introduced: false, due: now + 60 * 1000 },
+    }, ['a', 'b', 'c'].map(card));
+    expect(LtomorrowCount()).toBe(1);
+  });
+});
