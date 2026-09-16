@@ -378,3 +378,284 @@ describe('word insight', () => {
     expect(explained).toBeGreaterThan(25);
   });
 });
+
+// The word lists carry more than a meaning per word: a reflexive verb's `sich`,
+// a verb's auxiliary, a sentence the word appears in. Each of these used to be
+// printed and never checked, and the first of them was actively scored wrong.
+describe('what the grammar and example columns encode', () => {
+  const DWStoreStub = { KEYS: { LEARN: 'l' }, read: () => ({}), onMigrated: () => {}, prefs: () => ({}), queue: () => {} };
+  const documentStub = { addEventListener: () => {} };
+  type Card = { de: string; zh?: string; en?: string; grammar?: string; example?: string };
+  const learn = load<{
+    LspellAccepted(c: Card, input: string): boolean;
+    LisReflexive(c: Card): boolean;
+    LexampleDe(c: Card): string;
+    LexampleZh(c: Card): string;
+    Lnorm(s: string): string;
+  }>('learn.core.js', '{ LspellAccepted, LisReflexive, LexampleDe, LexampleZh, Lnorm }',
+    { DWStore: DWStoreStub, document: documentStub });
+
+  type Span = { before: string; word: string; after: string };
+  const drills = load<{
+    LauxOf(c: Card): { aux: string; part: string } | null;
+    LclozeSpan(c: Card): Span | null;
+    LclozeAccepted(c: Card, span: Span, input: string): boolean;
+  }>('drills-addon.js', '{ LauxOf, LclozeSpan, LclozeAccepted }',
+    { DWStore: DWStoreStub, document: documentStub, LexampleDe: learn.LexampleDe, Lnorm: learn.Lnorm });
+
+  describe('reflexive verbs', () => {
+    // `sich` is shown in the meaning column and nowhere else, so scoring against
+    // `de` alone marked a learner wrong for writing the form the card taught.
+    const freuen: Card = { de: 'freuen', zh: '（sich auf +A）期待', en: 'to be pleased' };
+
+    it('accepts the sich the card itself teaches', () => {
+      expect(learn.LspellAccepted(freuen, 'sich freuen')).toBe(true);
+    });
+
+    it('still accepts the bare infinitive, which is what `de` holds', () => {
+      expect(learn.LspellAccepted(freuen, 'freuen')).toBe(true);
+    });
+
+    it('accepts either way round when a deck does put sich in the headword', () => {
+      const other: Card = { de: 'sich erinnern', zh: '记得' };
+      expect(learn.LspellAccepted(other, 'erinnern')).toBe(true);
+      expect(learn.LspellAccepted(other, 'sich erinnern')).toBe(true);
+    });
+
+    it('does not hand out sich to a verb that is not reflexive', () => {
+      const kaufen: Card = { de: 'kaufen', zh: '买', en: 'to buy' };
+      expect(learn.LisReflexive(kaufen)).toBe(false);
+      expect(learn.LspellAccepted(kaufen, 'sich kaufen')).toBe(false);
+    });
+
+    it('is not fooled into accepting a different verb', () => {
+      expect(learn.LspellAccepted(freuen, 'sich fahren')).toBe(false);
+    });
+  });
+
+  describe('the auxiliary', () => {
+    it('reads haben or sein off the end of the grammar column', () => {
+      expect(drills.LauxOf({ de: 'gehen', grammar: 'er geht, ist gegangen' }))
+        .toEqual({ aux: 'sein', part: 'gegangen' });
+      expect(drills.LauxOf({ de: 'kaufen', grammar: 'er kauft, hat gekauft' }))
+        .toEqual({ aux: 'haben', part: 'gekauft' });
+    });
+
+    it('takes the last form when a B1 entry also lists the Präteritum', () => {
+      expect(drills.LauxOf({ de: 'verschwinden', grammar: 'er verschwindet, verschwand, ist verschwunden' }))
+        .toEqual({ aux: 'sein', part: 'verschwunden' });
+    });
+
+    it('keeps a participle that is more than one word', () => {
+      expect(drills.LauxOf({ de: 'ernst nehmen', grammar: 'er nimmt ernst, nahm ernst, hat ernst genommen' }))
+        .toEqual({ aux: 'haben', part: 'ernst genommen' });
+    });
+
+    it('asks nothing of a word whose perfect is not written down', () => {
+      expect(drills.LauxOf({ de: 'die Tür', grammar: '-en' })).toBe(null);
+      expect(drills.LauxOf({ de: 'schnell' })).toBe(null);
+      // An impersonal entry spells the subject out again, so there is no clean
+      // auxiliary to ask for.
+      expect(drills.LauxOf({ de: 'geben', grammar: 'es gibt, es hat gegeben' })).toBe(null);
+    });
+  });
+
+  describe('blanking a word out of its own example', () => {
+    const span = (c: Card) => drills.LclozeSpan(c);
+
+    it('finds the word where it stands unchanged', () => {
+      expect(span({ de: 'die Blume', example: 'Die Blume ist schön.（这朵花很美。）' }))
+        .toEqual({ before: 'Die ', word: 'Blume', after: ' ist schön.' });
+    });
+
+    it('covers the whole inflected form, not just the stem', () => {
+      expect(span({ de: 'international', example: 'Frankfurt hat einen internationalen Flughafen.（…）' })?.word)
+        .toBe('internationalen');
+      expect(span({ de: 'kaufen', example: 'Ich kaufe ein Brot.（我买一个面包。）' })?.word).toBe('kaufe');
+    });
+
+    // A wrong blank is worse than no question: it asks for a word that is not
+    // the one missing.
+    it('says nothing when the word is not recoverable from the sentence', () => {
+      // separable verb, split across the clause
+      expect(span({ de: 'zuordnen', example: 'Ordnen Sie die Bilder zu.（请把图片配对。）' })).toBe(null);
+      // strong stem change
+      expect(span({ de: 'sein', example: 'Hallo, ich bin Julia.（…）' })).toBe(null);
+      expect(span({ de: 'die Tür', example: '' })).toBe(null);
+    });
+
+    it('will not blank a two-letter word out of the middle of a longer one', () => {
+      // "an" must not swallow the "An" of "Anna"
+      expect(span({ de: 'an', example: 'Ich heiße Anna.（我叫安娜。）' })).toBe(null);
+    });
+
+    it('takes the dictionary form or the form the sentence uses', () => {
+      const c: Card = { de: 'kaufen', example: 'Ich kaufe ein Brot.（我买一个面包。）' };
+      const s = span(c)!;
+      expect(drills.LclozeAccepted(c, s, 'kaufe')).toBe(true);
+      expect(drills.LclozeAccepted(c, s, 'kaufen')).toBe(true);
+      expect(drills.LclozeAccepted(c, s, 'trinke')).toBe(false);
+    });
+
+    it('splits the two languages the example field packs together', () => {
+      const c: Card = { de: 'die Blume', example: 'Die Blume ist schön.（这朵花很美。）' };
+      expect(learn.LexampleDe(c)).toBe('Die Blume ist schön.');
+      expect(learn.LexampleZh(c)).toBe('这朵花很美。');
+      expect(learn.LexampleZh({ de: 'x', example: 'Nur Deutsch.' })).toBe('');
+    });
+  });
+});
+
+// Scheduling is the whole product: a word that comes back too late is forgotten
+// and one that never comes back was never really learnt.
+describe('when a word comes back', () => {
+  const documentStub = { addEventListener: () => {} };
+  type S = Record<string, unknown>;
+  const srs = (progress: Record<string, S> = {}, cards: unknown[] = []) =>
+    load<{
+      Linterval(s: S): number;
+      Lmastered(s: S): boolean;
+      LspotCards(n: number): Array<{ id: string }>;
+      LdueCards(): Array<{ id: string }>;
+      LtomorrowCount(): number;
+    }>('learn.core.js', '{ Linterval, Lmastered, LspotCards, LdueCards, LtomorrowCount }', {
+      DWStore: { KEYS: { LEARN: 'l' }, read: () => progress, onMigrated: () => {}, prefs: () => ({}), queue: () => {} },
+      document: documentStub,
+      CARDS: cards,
+    });
+
+  const DAY = 24 * 60 * 60 * 1000;
+  const card = (id: string) => ({ id, level: 'A1', chapter: '1', de: id });
+  const mastered = (due: number, extra: S = {}) =>
+    ({ introduced: true, strength: 5, cycles: 3, spellingPass: true, known: false, due, ...extra });
+
+  it('keeps stretching the gap past the fortnight it used to stop at', () => {
+    const { Linterval } = srs();
+    const at = (cycles: number) => Linterval({ cycles, spellingPass: true, hard: 0 });
+    expect(at(0)).toBe(10 * 60 * 1000);
+    expect(at(1)).toBe(DAY);
+    expect(at(2)).toBe(3 * DAY);
+    expect(at(3)).toBe(14 * DAY);
+    // A deck that takes a year to work through needs the far end of the ladder;
+    // it used to flatten out here and the word was dropped instead.
+    expect(at(4)).toBe(30 * DAY);
+    expect(at(5)).toBe(90 * DAY);
+    expect(at(12)).toBe(90 * DAY);
+  });
+
+  it('brings a word flagged 很难记 back in half the time', () => {
+    const { Linterval } = srs();
+    // the flag was written on every card and read by nothing
+    expect(Linterval({ cycles: 2, hard: 1, spellingPass: false })).toBe(1.5 * DAY);
+    expect(Linterval({ cycles: 3, hard: 2, spellingPass: false })).toBe(7 * DAY);
+    // and it stops shortening once the word has been written from memory
+    expect(Linterval({ cycles: 2, hard: 1, spellingPass: true })).toBe(3 * DAY);
+    // never below the within-session floor
+    expect(Linterval({ cycles: 0, hard: 3, spellingPass: false })).toBe(10 * 60 * 1000);
+  });
+
+  it('brings a mastered word back once its interval is up, oldest first', () => {
+    const now = Date.now();
+    const { LspotCards, LdueCards } = srs(
+      { a: mastered(now - DAY), b: mastered(now + 30 * DAY), c: mastered(now - 2 * DAY) },
+      ['a', 'b', 'c'].map(card));
+    expect(LspotCards(5).map((c) => c.id)).toEqual(['c', 'a']);
+    // and never through the ordinary queue, which is for words still being learnt
+    expect(LdueCards()).toEqual([]);
+  });
+
+  it('caps a day’s spot checks so they cannot crowd out the actual review', () => {
+    const now = Date.now();
+    const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+    const progress = Object.fromEntries(ids.map((id, i) => [id, mastered(now - (i + 1) * DAY)]));
+    expect(srs(progress, ids.map(card)).LspotCards(5)).toHaveLength(5);
+  });
+
+  it('checks a word claimed with 这个我已经会 rather than taking its word for it', () => {
+    const now = Date.now();
+    // That button set a due date 30 days out and Lmastered ignored it, so the
+    // claim was never tested: clicking it simply deleted the word from the app.
+    const claimed = mastered(now - 1, { known: true });
+    const { Lmastered, LspotCards } = srs({ a: claimed }, [card('a')]);
+    expect(Lmastered(claimed)).toBe(true);
+    expect(LspotCards(5).map((c) => c.id)).toEqual(['a']);
+  });
+
+  it('counts tomorrow, so an empty today does not read as an empty deck', () => {
+    const now = Date.now();
+    const { LtomorrowCount } = srs({
+      a: { introduced: true, due: now + 2 * 60 * 60 * 1000 },
+      b: { introduced: true, due: now + 5 * DAY },
+      c: { introduced: false, due: now + 60 * 1000 },
+    }, ['a', 'b', 'c'].map(card));
+    expect(LtomorrowCount()).toBe(1);
+  });
+});
+
+// A word can mean something different in the chapter you met it in, and the deck
+// marks that with a 这里：/ hier: prefix. Among four options it was a tell.
+describe('a chapter-specific sense', () => {
+  const documentStub = { addEventListener: () => {} };
+  type C = { id?: string; level?: string; chapter?: string; de: string; zh?: string; en?: string };
+  const opts = (cards: C[] = []) =>
+    load<{
+      LsenseFree(s: string): string;
+      LoptionEn(c: C): string;
+      Ldistractors(c: C, count?: number, labelOf?: (c: C) => string): C[];
+    }>('learn.core.js', '{ LsenseFree, LoptionEn, Ldistractors }', {
+      DWStore: { KEYS: { LEARN: 'l' }, read: () => ({}), onMigrated: () => {}, prefs: () => ({}), queue: () => {} },
+      document: documentStub, CARDS: cards,
+    });
+
+  it('drops the marker, wherever in the meaning it sits', () => {
+    const { LsenseFree } = opts();
+    expect(LsenseFree('这里：情况还好；进行得顺利')).toBe('情况还好；进行得顺利');
+    expect(LsenseFree('还；仍然；这里：任何')).toBe('还；仍然；任何');
+    expect(LsenseFree('hier: to be okay')).toBe('to be okay');
+    expect(LsenseFree('yet, even, hier: any')).toBe('yet, even, any');
+  });
+
+  it('leaves alone the words that merely look like the marker', () => {
+    const { LsenseFree, LoptionEn } = opts();
+    // the entry for the word hier is itself 这里, with no colon
+    expect(LsenseFree('这里')).toBe('这里');
+    expect(LsenseFree('hierarchical')).toBe('hierarchical');
+    expect(LoptionEn({ de: 'hierarchisch', en: 'hierarchical' })).toBe('hierarchical');
+    // and a meaning that is nothing but the marker keeps something to show
+    expect(LsenseFree('这里：')).toBe('这里：');
+  });
+
+  // Removing the tell exposed a question with two right answers, which the tell
+  // had been hiding: both entries for gehen are correct meanings of gehen.
+  it('never offers another sense of the same word as a wrong answer', () => {
+    const cards: C[] = [
+      { id: 'g1', level: 'A1', chapter: '1', de: 'gehen', en: 'to go' },
+      { id: 'g2', level: 'A1', chapter: '1', de: 'gehen', en: 'hier: to be okay' },
+      { id: 'k', level: 'A1', chapter: '1', de: 'kaufen', en: 'to buy' },
+      { id: 'l', level: 'A1', chapter: '1', de: 'lesen', en: 'to read' },
+      { id: 's', level: 'A1', chapter: '1', de: 'sehen', en: 'to see' },
+      { id: 't', level: 'A1', chapter: '1', de: 'trinken', en: 'to drink' },
+    ];
+    const { Ldistractors } = opts(cards);
+    for (const target of [cards[0], cards[1]]) {
+      const picked = Ldistractors(target);
+      expect(picked).toHaveLength(3);
+      expect(picked.map((x) => x.de)).not.toContain('gehen');
+    }
+  });
+
+  it('still separates two options that only differ by the marker', () => {
+    // stripping must not be able to produce two identical buttons
+    const cards: C[] = [
+      { id: 'a', level: 'A1', chapter: '1', de: 'laufen', en: 'hier: to run' },
+      { id: 'b', level: 'A1', chapter: '1', de: 'rennen', en: 'to run' },
+      { id: 'c', level: 'A1', chapter: '1', de: 'kaufen', en: 'to buy' },
+      { id: 'd', level: 'A1', chapter: '1', de: 'lesen', en: 'to read' },
+      { id: 'e', level: 'A1', chapter: '1', de: 'sehen', en: 'to see' },
+    ];
+    const { Ldistractors, LoptionEn } = opts(cards);
+    const picked = Ldistractors(cards[0]);
+    expect(picked.map((x) => x.de)).not.toContain('rennen');
+    expect(new Set([cards[0], ...picked].map(LoptionEn)).size).toBe(4);
+  });
+});

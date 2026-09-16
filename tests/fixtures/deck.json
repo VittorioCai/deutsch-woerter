@@ -409,6 +409,68 @@
    "en": "ticket",
    "zh": "车票",
    "grammar": "-n"
+  },
+  {
+   "level": "A1",
+   "chapter": "4",
+   "de": "freuen",
+   "en": "to be pleased",
+   "zh": "（sich auf +A）期待",
+   "grammar": "er freut, hat gefreut",
+   "example": "Ich freue mich auf den Sommer.（我期待夏天。）"
+  },
+  {
+   "level": "A1",
+   "chapter": "4",
+   "de": "gehen",
+   "en": "to go",
+   "zh": "走；去",
+   "grammar": "er geht, ist gegangen",
+   "example": "Wir gehen nach Hause.（我们回家。）"
+  },
+  {
+   "level": "A1",
+   "chapter": "4",
+   "de": "kaufen",
+   "en": "to buy",
+   "zh": "买",
+   "grammar": "er kauft, hat gekauft",
+   "example": "Ich kaufe ein Brot.（我买一个面包。）"
+  },
+  {
+   "level": "A1",
+   "chapter": "4",
+   "de": "die Blume",
+   "en": "flower",
+   "zh": "花",
+   "grammar": "-n",
+   "example": "Die Blume ist schön.（这朵花很美。）"
+  },
+  {
+   "level": "A1",
+   "chapter": "4",
+   "de": "international",
+   "en": "international",
+   "zh": "国际的",
+   "example": "Frankfurt hat einen internationalen Flughafen.（法兰克福有一座国际机场。）"
+  },
+  {
+   "level": "A1",
+   "chapter": "4",
+   "de": "zuordnen",
+   "en": "to match",
+   "zh": "配对",
+   "grammar": "er ordnet zu, hat zugeordnet",
+   "example": "Ordnen Sie die Bilder zu.（请把图片配对。）"
+  },
+  {
+   "level": "A1",
+   "chapter": "4",
+   "de": "gehen",
+   "en": "hier: to be okay",
+   "zh": "这里：进行得顺利",
+   "grammar": "er geht, ist gegangen",
+   "example": "Wie geht es dir?（你怎么样？）"
   }
  ]
 }
