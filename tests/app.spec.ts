@@ -1238,7 +1238,7 @@ test('the home screen asks where you are before it hands out A1 Kapitel 1', asyn
   await expect(page.locator('#browseOverlay')).toBeVisible();
 
   // The map is the empty state of the search sheet, one tile per Kapitel.
-  await expect(page.locator('.mapTile')).toHaveCount(6);
+  await expect(page.locator('.mapTile')).toHaveCount(7);
   await page.locator('.mapTile', { hasText: 'Kapitel 4' }).first().click();
   await expect(page.locator('.mapActions')).toContainText('A1 Kapitel 4');
   await page.locator('#mapStartHere').click();
@@ -1332,4 +1332,117 @@ test('a whole Kapitel can be marked known without clicking through it', async ({
 
   // And they stop being offered as new words.
   await expect(page.locator('.mapTile', { hasText: 'Kapitel 2' }).first()).toContainText('6/6 学过');
+});
+
+test('the preposition drill asks which one, and does not print it in the hint', async ({ page }) => {
+  await open(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#learnDrillBtn').click();
+  await page.locator('#tabRektion').click();
+  await expect(page.locator('#drillContent .coverage')).toContainText('介词 + 格');
+  // Two different skills, scored apart: a word governing a preposition, and a
+  // preposition governing a case.
+  await expect(page.locator('.drillRow')).toHaveCount(2);
+  await page.locator('#drillStart').click();
+
+  // Five entries in the fixture carry a Rektion note: freuen, warten, sprechen,
+  // die Frage and the preposition aus itself.
+  const total = Number((await page.locator('.wrongMini').textContent())!.match(/\/\s*(\d+)/)![1]);
+  expect(total).toBe(5);
+  for (let i = 0; i < total; i++) {
+    const word = (await page.locator('.drillWord').textContent())!.trim();
+    const hint = (await page.locator('.drillHint').textContent())!;
+    // The gloss spells the answer out in brackets; the question must not.
+    expect(hint, word).not.toMatch(/\+\s*(A|D|G|三格|四格|二格)/);
+    const buttons = page.locator('#drillContent .genderGrid button');
+    const labels = await buttons.allTextContents();
+    if (word === 'aus') expect(labels).toEqual(['三格', '四格', '二格']);
+    else {
+      // Four on a real deck; fewer here only because this fixture holds four
+      // combinations in total and a verb's own second preposition is excluded
+      // from its wrong answers.
+      expect(labels.length).toBeGreaterThanOrEqual(2);
+      expect(labels.length).toBeLessThanOrEqual(4);
+      expect(new Set(labels).size).toBe(labels.length);
+    }
+    await buttons.first().click();
+    await expect(page.locator('#drillFeedback')).toBeVisible();
+    await page.locator('#drillNext').click();
+  }
+  await expect(page.locator('#drillContent')).toContainText('本轮完成');
+});
+
+test('a verb governing two prepositions is not marked wrong for the other one', async ({ page }) => {
+  await open(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#learnDrillBtn').click();
+  await page.locator('#tabRektion').click();
+  // sprechen takes mit +D and über +A. Both are right, so neither may turn up
+  // as the other's wrong answer.
+  const both = await page.evaluate(() => {
+    const cards = (window as any).__deck.cards;
+    const c = cards.find((x: any) => x.de === 'sprechen');
+    const w = window as any;
+    return { r: w.__drillPeek ? null : null, de: c.de, zh: c.zh };
+  });
+  expect(both.zh).toContain('mit +D');
+  await page.locator('#drillStart').click();
+  const total = Number((await page.locator('.wrongMini').textContent())!.match(/\/\s*(\d+)/)![1]);
+  for (let i = 0; i < total; i++) {
+    const word = (await page.locator('.drillWord').textContent())!.trim();
+    const labels = await page.locator('#drillContent .genderGrid button').allTextContents();
+    if (word === 'sprechen') {
+      expect(labels.filter((l) => l === 'mit + 三格' || l === 'über + 四格')).toHaveLength(1);
+      // Whichever of the two is offered, clicking it is correct.
+      const right = labels.find((l) => l === 'mit + 三格' || l === 'über + 四格')!;
+      await page.locator('#drillContent .genderGrid button', { hasText: right }).click();
+      await expect(page.locator('#drillFeedback')).toContainText('✓ 对了');
+      return;
+    }
+    await page.locator('#drillContent .genderGrid button').first().click();
+    await page.locator('#drillNext').click();
+  }
+  throw new Error('sprechen never came up in the round');
+});
+
+test('the conjugation drill wants er nimmt, not er nehmt', async ({ page }) => {
+  await open(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#learnDrillBtn').click();
+  await page.locator('#tabConj').click();
+  // Four ways to get a conjugation wrong; one score would hide the only one
+  // that matters.
+  await expect(page.locator('.drillRow')).toHaveCount(4);
+  await expect(page.locator('.drillRow').first()).toContainText('变元音');
+  await page.locator('#drillStart').click();
+
+  let sawStrong = false, sawSeparable = false;
+  const total = Number((await page.locator('.wrongMini').textContent())!.match(/\/\s*(\d+)/)![1]);
+  for (let i = 0; i < total; i++) {
+    const word = (await page.locator('.drillWord').textContent())!.trim();
+    const hint = (await page.locator('.drillHint').textContent())!;
+    if (word === 'nehmen' && hint.includes('第三人称')) {
+      await page.locator('#drillAnswer').fill('er nehmt');
+      await page.locator('#drillCheck').click();
+      await expect(page.locator('#drillFeedback')).toContainText('✗ 正确答案');
+      await expect(page.locator('#drillFeedback .deAnswer')).toHaveText('er nimmt');
+      await expect(page.locator('#drillFeedback')).toContainText('强变化');
+      sawStrong = true;
+    } else if (word === 'aufstehen' && hint.includes('第三人称')) {
+      // The prefix goes to the end of the clause, which is the whole question.
+      await page.locator('#drillAnswer').fill('steht auf');
+      await page.locator('#drillCheck').click();
+      await expect(page.locator('#drillFeedback')).toContainText('✓ 对了');
+      await expect(page.locator('#drillFeedback')).toContainText('可分动词');
+      sawSeparable = true;
+    } else {
+      await page.locator('#drillShow').click();
+    }
+    // Whatever was asked, the whole row is shown: a strong verb's forms belong
+    // together.
+    await expect(page.locator('#drillFeedback .meta').first()).toContainText('er ');
+    if (sawStrong && sawSeparable) return;
+    await page.locator('#drillNext').click();
+  }
+  expect({ sawStrong, sawSeparable }).toEqual({ sawStrong: true, sawSeparable: true });
 });

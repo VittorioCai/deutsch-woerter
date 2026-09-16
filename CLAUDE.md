@@ -60,7 +60,7 @@ npm run verify                    # tsc + vitest + build + playwright，CI 跑�
 | `src/store.js` | localStorage 全部读写、迁移、备份提醒 |
 | `src/deck.js` | 词库解析、卡片 id、IndexedDB |
 | `src/insight.js` | 巧记规则表（性别/复合词/前缀，当场算） |
-| `src/drills-addon.js` | 专项训练：性别、复数、haben/sein、例句填空、听写 |
+| `src/drills-addon.js` | 专项训练：性别、复数、动词变位、haben/sein、介词+格、例句填空、听写 |
 | `src/wrongbook-addon.js` | 拼写错题本 + 错因分析 |
 | `src/mastered-addon.js` | 已掌握档案 |
 | `src/browse-addon.js` | 查词 + 章节地图 + 「学到哪了」的位置 |
@@ -133,11 +133,20 @@ npm run verify                    # tsc + vitest + build + playwright，CI 跑�
 `drills-addon.js:149`），一句德语句子听力都没有。
 </details>
 
-**5. 动词专项（两个新 drill）。**　✅ **haben/sein 已做**（变位填写未做）
+**5. 动词专项（两个新 drill）。**　✅ **两个都已做**
 新增「haben / sein」专项：真实词库 **379 条**可出题（haben 273 · sein 106）。
 准确率按助动词分开报，理由和性别题一样——一个总分会美化学习者。
 唯一出不了题的是 `geben`（`es gibt, es hat gegeben`，无人称，助动词前面还有个 `es`）。
 顺带修了 `LdrillAccuracy`：它原本写死只统计名词，听写的准确率一直是拿名词集算的。
+
+新增「动词变位」专项，真实词库 **368 个动词**能出题：
+- **91 个变元音**（`nehmen → er nimmt`，不是 nehmt）、**157 个可分**（`aufstehen → er steht auf`，
+  前缀甩到句末）、**120 个规则**。**144 个带 Präteritum** 的按位置轮到过去式
+  （`LconjAsk(c, i)` 按队列位置交替，不用随机数，所以一轮的题是可复现的）
+- 准确率按这四类分开报——一个总分会把唯一重要的那类（没人提醒过你的元音变化）藏起来
+- 答完不管问的是哪一形，都把整行摆出来（`er spricht · er sprach · er hat gesprochen`），
+  因为强变化动词的三个形本来就是一起记的
+- 多词词条（`spazieren gehen`、`los sein`，共 5 条）不出题
 <details><summary>原始记录</summary>
 语法栏里有 **380 条**动词变位（`er geht, ist gegangen`），其中 **374 条**能直接解析出分词、
 可以出题（A1/A2 两分形 228 条，B1 带 Präteritum 三分形 146 条）。
@@ -150,9 +159,20 @@ npm run verify                    # tsc + vitest + build + playwright，CI 跑�
 - **变位填写**：给不定式，写第三人称或过去分词（`nehmen → er nimmt`，不是 `nehmt`）。
 </details>
 
-**6. 支配格（Rektion）专项。**
-174 条卡片的 `zh` 里带 `（auf +A）`、`（mit +D）`。这正是 B1 考试考、而「看意思选德语」
-永远测不到的东西。题型：给动词和意思，选介词 + 格。数据已经在那里，只差一个正则。
+**6. 支配格（Rektion）专项。**　✅ **已做**
+新增「介词 + 格」专项，真实词库 **174 条全部能出题**，分成两种题型（分开计分，因为是两种能力）：
+- **128 条搭配题**：给词和意思，选「介词 + 格」（`warten` → `auf + 四格`）。
+  5 条动词支配两个介词（`sprechen mit +D / über +A`），两个都算对，
+  而且**另一个正确答案绝不会作为干扰项出现**
+- **46 条支配题**：给介词，选它支配的格。其中 **1 条是 `helfen`**——
+  它不是介词，是直接支配三格的动词（`Ich helfe dir`，不是 dich），
+  所以题面措辞不同（「这个词后面直接跟哪个格？」），但确实该考
+- 提示里的括号会先摘掉：`等待（auf +A 等某人）` → 只显示「等待」。
+  不摘等于把答案印在题面上——和第 2 条是同一类 bug
+- 介词必须在白名单里才算数（补上了 `ab / außer / außerhalb / innerhalb / entgegen`）；
+  裸的格标记必须**紧跟在括号开头**（词库就是这么写的：`帮助（+D 帮某人）`），
+  散落在正文里的 `+A` 不出题
+- 干扰项不够（小词库）时不出题，而不是出个只有一个按钮的题
 
 **7. 巧记补动词规则。**
 `insight.js` 已经会讲可分/不可分前缀，但从变位栏还能算出更多：强变化的元音变化类

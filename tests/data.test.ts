@@ -823,3 +823,136 @@ describe('finding one word among five thousand', () => {
     expect(browse.LbrowseFind('   ')).toEqual([]);
   });
 });
+
+// Two more columns the deck has always carried and the app has only ever
+// printed: which preposition a word governs, and what a verb does to its own
+// stem in the third person.
+describe('the two things a Chinese gloss cannot tell you', () => {
+  type Card = { id?: string; level?: string; chapter?: string; de: string; zh?: string; en?: string; grammar?: string };
+  const documentStub = { addEventListener: () => {}, getElementById: () => null };
+  const DWStoreStub = { KEYS: { LEARN: 'l' }, read: () => ({}), onMigrated: () => {}, prefs: () => ({}), queue: () => {} };
+  const learn = load<{ Lnorm(s: string): string; LsenseFree(s: string): string; Lmeaning(c: Card): string; Lenglish(c: Card): string; LhasZh(c: Card): boolean; Lshuffle<T>(a: T[]): T[] }>(
+    'learn.core.js', '{ Lnorm, LsenseFree, Lmeaning, Lenglish, LhasZh, Lshuffle }', { DWStore: DWStoreStub, document: documentStub });
+
+  type Rek = { kind: 'prep'; combos: Array<{ prep: string; kase: string }> } | { kind: 'case'; cases: string[]; isPrep: boolean } | null;
+  type Conj = { inf: string; present: string; past: string; perfect: string; separable: boolean; regular: boolean } | null;
+  const drillsOver = (cards: Card[]) => load<{
+    LrektionOf(c: Card): Rek;
+    LrektionHint(c: Card): string;
+    LrektionAccepted(c: Card, picked: string): boolean;
+    LrektionOptions(c: Card): string[];
+    LrektionCombos(): string[];
+    LconjOf(c: Card): Conj;
+    LconjAsk(c: Card, i: number): string;
+    LconjAccepted(c: Card, ask: string, input: string): boolean;
+  }>('drills-addon.js',
+    '{ LrektionOf, LrektionHint, LrektionAccepted, LrektionOptions, LrektionCombos, LconjOf, LconjAsk, LconjAccepted }',
+    { DWStore: DWStoreStub, document: documentStub, CARDS: cards, Lnorm: learn.Lnorm, LsenseFree: learn.LsenseFree,
+      Lenglish: learn.Lenglish, Lshuffle: learn.Lshuffle,
+      // In the app the Chinese lives in a ZH map keyed by id, filled from c.zh
+      // at boot; here it is read off the card, which is the same value.
+      Lmeaning: (c: Card) => c.zh || learn.Lenglish(c), LhasZh: (c: Card) => !!c.zh });
+
+  describe('which preposition, and which case', () => {
+    const warten: Card = { id: 'w', de: 'warten', zh: '等待（auf +A 等某人／某事）', en: 'to wait (auf +A)' };
+    const sprechen: Card = { id: 's', de: 'sprechen', zh: '说；讲（mit +D 和某人说；über +A 谈论）', en: 'to speak' };
+    const aus: Card = { id: 'a', de: 'aus', zh: '这里：来自（+三格）', en: 'hier: from (+D)' };
+    const d = drillsOver([warten, sprechen, aus]);
+
+    it('reads the preposition and the case out of the gloss', () => {
+      expect(d.LrektionOf(warten)).toEqual({ kind: 'prep', combos: [{ prep: 'auf', kase: '四格' }] });
+    });
+
+    it('keeps both prepositions when a verb governs two', () => {
+      // sprechen mit +D and sprechen über +A are both right, so neither may be
+      // offered as the other's wrong answer.
+      const r = d.LrektionOf(sprechen)!;
+      expect(r.kind).toBe('prep');
+      expect((r as { combos: Array<{ prep: string }> }).combos.map((x) => x.prep)).toEqual(['mit', 'über']);
+      expect(d.LrektionAccepted(sprechen, 'mit + 三格')).toBe(true);
+      expect(d.LrektionAccepted(sprechen, 'über + 四格')).toBe(true);
+      expect(d.LrektionAccepted(sprechen, 'auf + 四格')).toBe(false);
+      expect(d.LrektionOptions(sprechen)).not.toContain('über + 四格');
+    });
+
+    it('asks a preposition about its own case instead of about itself', () => {
+      expect(d.LrektionOf(aus)).toEqual({ kind: 'case', cases: ['三格'], isPrep: true });
+      expect(d.LrektionOptions(aus)).toEqual(['三格', '四格', '二格']);
+      expect(d.LrektionAccepted(aus, '三格')).toBe(true);
+      expect(d.LrektionAccepted(aus, '四格')).toBe(false);
+    });
+
+    it('takes the answer back out of the hint', () => {
+      // The gloss writes the answer in brackets. Printing it under the question
+      // is the same tell the multiple-choice options used to have.
+      expect(d.LrektionHint(warten)).toBe('等待');
+      expect(d.LrektionHint(sprechen)).toBe('说；讲');
+      expect(d.LrektionHint(aus)).toBe('来自');
+      for (const c of [warten, sprechen, aus]) expect(d.LrektionHint(c)).not.toMatch(/\+\s*(A|D|G|三格|四格|二格)/);
+    });
+
+    it('says nothing rather than guessing at a case marker loose in prose', () => {
+      // The deck writes a Rektion note as its own bracket. A `+A` in the middle
+      // of running text is not one, and neither is a noun a preposition.
+      const noise: Card = { id: 'n', de: 'das Haus', zh: '房子（很大 +A 的那种）', en: 'house' };
+      expect(drillsOver([noise]).LrektionOf(noise)).toBe(null);
+    });
+
+    it('asks a dative verb about its case without calling it a preposition', () => {
+      // helfen takes the dative with no preposition at all — Ich helfe dir,
+      // never dich. Same three answers, different question.
+      const helfen: Card = { id: 'h', de: 'helfen', zh: '帮助（+D 帮某人）', en: 'to help (+D)' };
+      const r = drillsOver([helfen]).LrektionOf(helfen)!;
+      expect(r).toEqual({ kind: 'case', cases: ['三格'], isPrep: false });
+      const ausR = drillsOver([aus]).LrektionOf(aus)!;
+      expect(ausR.kind === 'case' && ausR.isPrep).toBe(true);
+    });
+  });
+
+  describe('what a verb does to its own stem', () => {
+    const nehmen: Card = { id: 'n', de: 'nehmen', zh: '拿；取', grammar: 'er nimmt, hat genommen' };
+    const aufstehen: Card = { id: 'a', de: 'aufstehen', zh: '起床', grammar: 'er steht auf, ist aufgestanden' };
+    const kochen: Card = { id: 'k', de: 'kochen', zh: '做饭', grammar: 'er kocht, hat gekocht' };
+    const sprechen: Card = { id: 's', de: 'sprechen', zh: '说', grammar: 'er spricht, sprach, hat gesprochen' };
+    const d = drillsOver([nehmen, aufstehen, kochen, sprechen]);
+
+    it('marks the stem change that nobody warns you about', () => {
+      expect(d.LconjOf(nehmen)).toEqual({ inf: 'nehmen', present: 'nimmt', past: '', perfect: 'hat genommen', separable: false, regular: false });
+      expect(d.LconjOf(kochen)!.regular).toBe(true);
+    });
+
+    it('knows a separable prefix goes to the end', () => {
+      const k = d.LconjOf(aufstehen)!;
+      expect(k.present).toBe('steht auf');
+      expect(k.separable).toBe(true);
+      expect(d.LconjAccepted(aufstehen, 'present', 'er steht auf')).toBe(true);
+      expect(d.LconjAccepted(aufstehen, 'present', 'steht auf')).toBe(true);
+      expect(d.LconjAccepted(aufstehen, 'present', 'aufsteht')).toBe(false);
+    });
+
+    it('scores er nimmt right and er nehmt wrong', () => {
+      expect(d.LconjAccepted(nehmen, 'present', 'er nimmt')).toBe(true);
+      expect(d.LconjAccepted(nehmen, 'present', 'nimmt')).toBe(true);
+      expect(d.LconjAccepted(nehmen, 'present', 'nehmt')).toBe(false);
+    });
+
+    it('reaches the Präteritum the B1 entries carry, and only those', () => {
+      expect(d.LconjOf(sprechen)!.past).toBe('sprach');
+      // Alternating by position keeps a round predictable; a two-form entry has
+      // no Präteritum to ask for, so it never gets that question.
+      expect(d.LconjAsk(sprechen, 1)).toBe('past');
+      expect(d.LconjAsk(sprechen, 0)).toBe('present');
+      expect(d.LconjAsk(nehmen, 1)).toBe('present');
+      expect(d.LconjAccepted(sprechen, 'past', 'sprach')).toBe(true);
+      expect(d.LconjAccepted(sprechen, 'past', 'spricht')).toBe(false);
+    });
+
+    it('refuses a multi-word entry rather than asking a question about half of it', () => {
+      const spazieren: Card = { id: 'z', de: 'spazieren gehen', zh: '散步', grammar: 'er geht spazieren, ist spazieren gegangen' };
+      const plural: Card = { id: 'p', de: 'die Frage', zh: '问题', grammar: 'Plural: die Fragen' };
+      const dd = drillsOver([spazieren, plural]);
+      expect(dd.LconjOf(spazieren)).toBe(null);
+      expect(dd.LconjOf(plural)).toBe(null);
+    });
+  });
+});
