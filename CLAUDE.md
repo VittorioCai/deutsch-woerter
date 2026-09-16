@@ -60,7 +60,7 @@ npm run verify                    # tsc + vitest + build + playwright，CI 跑�
 | `src/store.js` | localStorage 全部读写、迁移、备份提醒 |
 | `src/deck.js` | 词库解析、卡片 id、IndexedDB |
 | `src/insight.js` | 巧记规则表（性别/复合词/前缀，当场算） |
-| `src/drills-addon.js` | 专项训练：性别、复数、听写 |
+| `src/drills-addon.js` | 专项训练：性别、复数、haben/sein、例句填空、听写 |
 | `src/wrongbook-addon.js` | 拼写错题本 + 错因分析 |
 | `src/mastered-addon.js` | 已掌握档案 |
 
@@ -69,7 +69,7 @@ npm run verify                    # tsc + vitest + build + playwright，CI 跑�
 # 待办：让引擎读懂词库
 
 **背景（2026-09 评估）。** 核心循环是扎实的。真正的缺口是词库已经比应用聪明了——
-当前这份 5434 词的库里有 **1670 条例句、380 条动词变位、79 条反身标记、174 条介词支配格、
+当前这份 5434 词的库里有 **1670 条例句、380 条动词变位、84 条反身动词、174 条介词支配格、
 175 条"本章义项"**，应用把它们全部当成一段文本显示了事。所以优先级最高的不是加新功能，
 是让引擎用上已经在那里的数据。
 
@@ -77,11 +77,17 @@ npm run verify                    # tsc + vitest + build + playwright，CI 跑�
 
 ## P0 · 三个 bug（惩罚学得更好的人）
 
-**1. 反身动词：写对了反而判错。**
+**1. 反身动词：写对了反而判错。**　✅ **已修**
+`LspellAccepted` 现在把 `sich` 当成和名词冠词一样的可选成分，两个方向都认。
+真实词库里 84 条反身词，其中 82 条 `de` 是裸动词、2 条 `de` 自带 `sich`（同一份词库两种写法都有），
+现在带不带 `sich` 都判对，且没有一条非反身动词被误放行。
+错题本原本拷了一份同样的规则，已改成委托给同一个函数——那份拷贝就是它继续判错的原因。
+<details><summary>原始记录</summary>
 `LspellAccepted`（`learn.core.js:92`）比对 `de`，而反身动词的 `de` 是裸的 `freuen`，
 `sich` 只写在 `zh` 里（`（sich auf +A）期待`）。实测：输入 `sich freuen` 判**错**，
 输入 `freuen` 判对。**79 条反身动词全部受影响。**
 修法：拼写比对时允许去掉前置 `sich`——和名词去冠词是同一套逻辑，就在同一个函数里。
+</details>
 
 **2. 「这里：/hier:」在选择题里漏答案。**
 `Ldistractors`（`learn.core.js:72`）只按 `Lnorm` 去重，不剥义项前缀。四个选项里唯一
@@ -95,15 +101,27 @@ npm run verify                    # tsc + vitest + build + playwright，CI 跑�
 
 ## P1 · 用上已有数据（投入最小、收益最大）
 
-**4. 例句 cloze + 整句发音。**
+**4. 例句 cloze + 整句发音。**　✅ **已做**
+新增「例句填空」专项：真实词库 1670 条例句里 **1413 条**能可靠定位并出题。
+词在句中变形的（`international` → `internationalen`）挖掉整个变化形式，答原形或变化形式都算对；
+定位不到的（可分动词拆开、`sein` → `bin`）**不出题**，而不是出个错题。
+例句现在先只显示德文，中文点开才看；🔊 按钮送整句——`LaudioUrl` 只匹配单词，
+所以句子会自动落到合成语音，不用改发音那条链路。
+<details><summary>原始记录</summary>
 1670 条例句全是 `德文。（中文）` 的严格格式，且保证词条一定出现在德文句中（有脚本验证过）。
 挖掉词条让人填 = 现成的语境练习。而且 **312 条动词例句里出现的是变位形式**
 （`Ich gehe…`、`er nimmt … teil`），cloze 顺手把变位练了。
 同一份数据还能做两件事：先只显示德文、点开才显示中文（现在一起显示）；
 把整句送 TTS——**目前 `Lspeak` 从头到尾只念过单词**（`learn.core.js:161`、
 `drills-addon.js:149`），一句德语句子听力都没有。
+</details>
 
-**5. 动词专项（两个新 drill）。**
+**5. 动词专项（两个新 drill）。**　✅ **haben/sein 已做**（变位填写未做）
+新增「haben / sein」专项：真实词库 **379 条**可出题（haben 273 · sein 106）。
+准确率按助动词分开报，理由和性别题一样——一个总分会美化学习者。
+唯一出不了题的是 `geben`（`es gibt, es hat gegeben`，无人称，助动词前面还有个 `es`）。
+顺带修了 `LdrillAccuracy`：它原本写死只统计名词，听写的准确率一直是拿名词集算的。
+<details><summary>原始记录</summary>
 语法栏里有 **380 条**动词变位（`er geht, ist gegangen`），其中 **374 条**能直接解析出分词、
 可以出题（A1/A2 两分形 228 条，B1 带 Präteritum 三分形 146 条）。
 剩下 6 条是多词动词（`es gibt`、`spazieren gehen`、`ernst nehmen`…），分词是两个词，要单独处理。
@@ -113,6 +131,7 @@ npm run verify                    # tsc + vitest + build + playwright，CI 跑�
   不得不按冠词分开报；助动词只有两个按钮，真会和瞎猜几轮就分得出来。
   而且 `Ich habe gegangen` 是母语者立刻听得出的错，现在却从没考过。
 - **变位填写**：给不定式，写第三人称或过去分词（`nehmen → er nimmt`，不是 `nehmt`）。
+</details>
 
 **6. 支配格（Rektion）专项。**
 174 条卡片的 `zh` 里带 `（auf +A）`、`（mit +D）`。这正是 B1 考试考、而「看意思选德语」
@@ -174,5 +193,10 @@ npm run verify                    # tsc + vitest + build + playwright，CI 跑�
 
 ---
 
-**如果只做三件事：** 1（反身判错）→ 4（例句 cloze + 整句发音）→ 5（haben/sein）。
-大约两三天，但会让这一周补进词库的东西第一次真正被用上。
+**这三件已经做完**（1 反身判错、4 例句填空 + 整句发音、5 haben/sein），
+词库里的例句和变位第一次被真正用上。**下一个该做的是 3**（「我已经会」永久出局）——
+它和 8（间隔只到 14 天）是同一个问题的两半：学一年的词库，现在没有任何长期复习。
+
+**跑测试要注意：** 这台机器上 Playwright 的浏览器版本和项目 pin 的对不上，
+用仓库早就预留好的变量绕开，别去跑 `playwright install`：
+`PLAYWRIGHT_CHROMIUM_PATH=/opt/pw-browsers/chromium-1194/chrome-linux/chrome npm run verify`

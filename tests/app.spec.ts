@@ -13,8 +13,9 @@ const SCHEMA_KEY = 'netzwerk_vocab_schema';
 
 // The app ships with no vocabulary of its own, so every test brings its own deck.
 // It is a small, made-up word list rather than a copy of anyone's textbook, and
-// it is deliberately shaped like a real one: three chapters, two levels, nouns of
-// all three genders, two words sharing a meaning, and one word listed twice.
+// it is deliberately shaped like a real one: four chapters, two levels, nouns of
+// all three genders, two words sharing a meaning, one word listed twice, and a
+// chapter of verbs carrying the conjugation and example data the drills read.
 const FIXTURE = readFileSync(new URL('./fixtures/deck.json', import.meta.url), 'utf8');
 
 const deck = async (page: Page): Promise<Array<{ id: string; level: string; chapter: string; de: string }>> =>
@@ -369,6 +370,119 @@ test('plural drill accepts every attested plural of the same noun', async ({ pag
   await page.locator('#drillShow').click();
   await expect(page.locator('#drillFeedback')).toContainText('正确答案');
   await expect(page.locator('#drillFeedback .deAnswer')).toContainText('die ');
+});
+
+test('a reflexive verb spelled with its sich is not marked wrong', async ({ page }) => {
+  await open(page);
+  await page.locator('#goLearn').click();
+  await page.selectOption('#learnLevel', 'A1');
+  await page.selectOption('#learnChapter', '4');
+  await page.selectOption('#learnCount', '5');
+  await page.locator('#learnSpellToggle').check();
+  await page.locator('#learnStartBtn').click();
+
+  // Walk the round until the reflexive verb comes up for active spelling. The
+  // card teaches `sich freuen` in its meaning column but stores the bare
+  // `freuen` as the headword, and the answer used to be scored against the
+  // headword alone — so the learner who had absorbed the sich was the one
+  // marked wrong.
+  let typed = false;
+  for (let i = 0; i < 80 && !typed; i++) {
+    const badge = (await page.locator('#learnBadge').textContent()) || '';
+    if (/本轮完成/.test(badge)) break;
+    if (await page.locator('#learnRemember').count()) { await page.locator('#learnRemember').click(); continue }
+    if (/主动拼写/.test(badge)) {
+      const zh = (await page.locator('#learnBody .learnZh').textContent()) || '';
+      if (/期待/.test(zh)) {
+        expect(zh).toContain('sich');   // the only place the sich is ever shown
+        await page.locator('#learnAnswer').fill('sich freuen');
+        await page.locator('#learnSubmit').click();
+        await expect(page.locator('#learnFeedback')).toContainText('✓ 对了');
+        typed = true;
+        break;
+      }
+      await page.locator('#learnShow').click();
+    } else if (await page.locator('#learnBody .choice').count()) {
+      await page.locator('#learnBody .choice').first().click();
+    }
+    await page.locator('#learnNextBtn').click();
+  }
+  expect(typed).toBe(true);
+});
+
+test('haben/sein drill asks for the auxiliary and scores each one apart', async ({ page }) => {
+  await open(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#learnDrillBtn').click();
+  await page.locator('#tabAux').click();
+  await expect(page.locator('#drillContent')).toContainText('haben / sein');
+  await page.locator('#drillStart').click();
+
+  const buttons = page.locator('#drillContent .genderGrid button');
+  await expect(buttons).toHaveCount(2);
+  await expect(buttons.nth(0)).toHaveText('haben');
+  await expect(buttons.nth(1)).toHaveText('sein');
+  // the prompt shows the participle only: printing hat/ist would answer it
+  await expect(page.locator('.drillWord')).toContainText('___');
+  await expect(page.locator('.drillWord')).not.toContainText(/\b(hat|ist)\b/);
+
+  await buttons.nth(0).click();
+  await expect(page.locator('#drillContent .genderGrid button.correct')).toHaveCount(1);
+  await expect(page.locator('#drillFeedback .deAnswer')).toContainText(/^er (hat|ist) /);
+  await page.locator('#drillNext').click();
+  await expect(page.locator('.drillWord')).toBeVisible();
+
+  // Guessing the commoner auxiliary scores well over half, so one combined
+  // figure would flatter the learner the way a single gender score does.
+  await page.locator('#drillClose').click();
+  await page.locator('#learnDrillBtn').click();
+  const rows = page.locator('#drillContent .drillRow');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText('haben');
+  await expect(rows.nth(1)).toContainText('sein');
+});
+
+test('cloze blanks the word out of its own example without leaking it', async ({ page }) => {
+  await open(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#learnDrillBtn').click();
+  await page.locator('#tabCloze').click();
+  await expect(page.locator('#drillContent')).toContainText('例句填空');
+  await page.locator('#drillStart').click();
+
+  await expect(page.locator('.clozeBlank')).toHaveCount(1);
+  const asked = (await page.locator('.clozeSentence').textContent()) || '';
+  expect(asked.length).toBeGreaterThan(5);
+
+  await page.locator('#drillShow').click();
+  const answer = (await page.locator('#drillFeedback .clozeHit').textContent()) || '';
+  expect(answer.length).toBeGreaterThan(2);
+  // the question must not have contained the word it was asking for
+  expect(asked).not.toContain(answer);
+  // and the whole sentence, not just the word, can be played back
+  await expect(page.locator('#drillFeedback .speakBtn')).toHaveAttribute('data-say', /\s/);
+});
+
+test('an example is shown in German first and read aloud whole', async ({ page }) => {
+  await open(page);
+  await page.locator('#goLearn').click();
+  await page.selectOption('#learnLevel', 'A1');
+  await page.selectOption('#learnChapter', '4');
+  await page.locator('#learnStartBtn').click();
+
+  await expect(page.locator('#learnBody .exampleDe')).toBeVisible();
+  const de = (await page.locator('#learnBody .exampleDe').textContent()) || '';
+  // the translation is packed into the same field but stays behind a tap
+  expect(de).not.toMatch(/[一-鿿]/);
+  await expect(page.locator('#learnBody .exampleZhShown')).toHaveCount(0);
+
+  // every earlier spoken thing in the app was a single word
+  const say = await page.locator('#learnBody .example .speakBtn').getAttribute('data-say');
+  expect(say).toContain(' ');
+  expect(say).not.toMatch(/[一-鿿]/);
+
+  await page.locator('#learnBody .exampleZh').click();
+  await expect(page.locator('#learnBody .exampleZhShown')).toHaveText(/[一-鿿]/);
 });
 
 test('wrong-book explains what kind of mistake was made', async ({ page }) => {

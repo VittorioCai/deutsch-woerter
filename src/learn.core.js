@@ -8,6 +8,15 @@ const Lesc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"
 const Lnorm=s=>(s||"").toLowerCase().trim().replace(/[|·.,;:!?()[\]{}“”„"']/g," ").replace(/\s+/g," ").replace(/ß/g,"ss");
 const LwithoutArticle=s=>Lnorm(s).replace(/^(der|die|das)\s+/,"");
 const LisNoun=c=>/^(der|die|das)\s/i.test(c.de);
+// A reflexive verb's `sich` lives in the meaning column — （sich auf +A）期待 —
+// never in `de`, because the headword field holds the infinitive alone. The card
+// therefore teaches a form the field it is scored against does not contain.
+const LisReflexive=c=>/^sich\s/i.test(c.de||"")||/\bsich\b/i.test(c.zh||"")||/\bsich\b/i.test(c.en||"");
+const LwithoutSich=s=>Lnorm(s).replace(/^sich\s+/,"");
+// Examples are stored as `Deutsch.（中文）` — one field, two languages — so a
+// sentence can be shown, hidden or spoken half at a time.
+const LexampleDe=c=>String(c.example||"").split("（")[0].trim();
+const LexampleZh=c=>{const m=String(c.example||"").match(/（([^）]*)）\s*$/);return m?m[1]:""};
 const Lclean=s=>(s||"").replace(/^[_\-–—\s]+/,"").replace(/\s*\([^)]*\)\s*$/," ").trim();
 const Lshuffle=a=>a.map(v=>({v,r:Math.random()})).sort((a,b)=>a.r-b.r).map(x=>x.v);
 const LDE_CHARS=["ä","ö","ü","ß","Ä","Ö","Ü"];
@@ -81,7 +90,15 @@ if(cs.length<count)for(const x of LallLearningCards()){if(cs.length>=count)break
 return Lshuffle(cs).slice(0,count)}
 function Linsight(c){if(typeof DWInsight==="undefined"||!c)return "";let rows=[];try{rows=DWInsight.Lanalyse(c,CARDS)}catch(e){console.error("insight failed",e);return ""}if(!rows.length)return "";return `<div class="insightBox"><b>🧠 巧记</b>${rows.map(r=>`<div class="insightRow"><span class="insightLabel">${Lesc(r.label)}</span><span class="insightText">${Lesc(r.text)}${r.note?`<i class="insightNote">${Lesc(r.note)}</i>`:""}</span></div>`).join("")}</div>`}
 window.Linsight=Linsight;
-function Ldetails(c){return `${Linsight(c)}${c.grammar?`<div class="grammarBox"><b>词形信息</b><br>${Lesc(c.grammar)}</div>`:""}${c.example?`<div class="example"><b>例句</b><br>${Lesc(c.example)}</div>`:""}`}
+// The sentence used to be printed with its translation already beside it, and
+// nothing ever read it aloud — every spoken word in the app was a single word.
+// Showing the German alone first makes it something to read; the speaker button
+// carries a whole sentence because LaudioUrl only matches single words, so
+// anything longer falls through to synthesis on its own.
+function Lexample(c){if(!c.example)return "";const de=LexampleDe(c),zh=LexampleZh(c);
+ return `<div class="example"><b>例句</b> ${LspeakBtn(de)}<div class="exampleDe">${Lesc(de)}</div>${zh?`<button type="button" class="exampleZh" data-zh="${Lesc(zh)}">看中文</button>`:""}</div>`}
+document.addEventListener("click",e=>{const b=e.target.closest(".exampleZh");if(!b)return;e.preventDefault();const d=document.createElement("div");d.className="exampleZhShown";d.textContent=b.dataset.zh;b.replaceWith(d)});
+function Ldetails(c){return `${Linsight(c)}${c.grammar?`<div class="grammarBox"><b>词形信息</b><br>${Lesc(c.grammar)}</div>`:""}${Lexample(c)}`}
 function Lrender(){const fb=L$("learnFeedback");fb.className="feedback";fb.innerHTML="";L$("learnNextBtn").style.display="none";learnAnswered=false;if(learnPos>=learnQueue.length)return Lfinish();const t=learnQueue[learnPos],c=t.c;L$("learnBadge").textContent=`${Llabel(t.type)} · ${learnPos+1}/${learnQueue.length}`;L$("learnBar").style.width=`${Math.round(learnPos/learnQueue.length*100)}%`;if(t.type==="intro")Lintro(c);else if(t.type==="recognize")Lrecognize(c);else if(t.type==="reverse")Lreverse(c);else Lspell(c)}
 function Lintro(c){L$("learnBody").innerHTML=`<div class="phaseTitle">先建立第一印象：今天不要求你一上来就默写。</div><div class="learnWord">${Lesc(c.de)}</div><div class="learnZh">${Lesc(Lmeaning(c))}</div><div class="learnEn">${Lesc(LmeaningMeta(c))}</div>${Ldetails(c)}<div class="learnActions"><button class="secondary" id="learnSpeak">🔊 发音</button><button class="secondary" id="learnHard">😵 很难记</button><button class="primary" id="learnRemember">记住了，继续</button><button class="secondary" id="learnKnown">这个我已经会</button></div><div class="sourceNote">发音优先使用真人录音，没有录音时用设备的德语 TTS；词形、语法信息和例句来自你导入的词库。</div>`;L$("learnSpeak").onclick=()=>Lspeak(c.de);L$("learnRemember").onclick=()=>LintroDone(c,false,false);L$("learnHard").onclick=()=>LintroDone(c,true,false);L$("learnKnown").onclick=()=>LintroDone(c,false,true)}
 function LintroDone(c,hard,known){const s=Lstate(c);s.introduced=true;s.last=Date.now();if(known){s.known=true;s.strength=5;s.spellingPass=true;s.cycles=3;s.due=Date.now()+30*24*60*60*1000;learnQueue=learnQueue.filter((t,i)=>i<=learnPos||t.c.id!==c.id)}else if(hard){s.hard=(s.hard||0)+1;s.strength=0;s.due=Date.now()}else{s.strength=Math.max(1,s.strength||0);s.due=Date.now()}Lsave(c,s);learnPos++;Lrender()}
@@ -89,7 +106,16 @@ function Lrecognize(c){const opts=Lshuffle([c,...Ldistractors(c)]);L$("learnBody
 function Lreverse(c){const opts=Lshuffle([c,...Ldistractors(c,3,x=>x.de)]);L$("learnBody").innerHTML=`<div class="phaseTitle">看到意思，先认出正确的德语。</div><div class="learnZh">${Lesc(Lmeaning(c))}</div><div class="learnEn">${LhasZh(c)?Lesc(Lenglish(c)):""}</div><div class="choiceGrid">${opts.map(x=>`<button class="choice" data-id="${Lesc(x.id)}">${Lesc(x.de)}</button>`).join("")}</div>`;document.querySelectorAll("#learnBody .choice").forEach(b=>b.onclick=()=>Lchoice(c,b.dataset.id,c.id,"reverse"))}
 function Lchoice(c,picked,expected,type){if(learnAnswered)return;learnAnswered=true;const ok=picked===expected;document.querySelectorAll("#learnBody .choice").forEach(b=>{b.disabled=true;if(b.dataset.id===expected)b.classList.add("correct");else if(b.dataset.id===picked)b.classList.add("wrong")});Lrecord(c,ok,type);Lfeedback(c,ok);L$("learnNextBtn").style.display="";Lbring(L$("learnNextBtn"),"end")}
 function Lspell(c){L$("learnBody").innerHTML=`<div class="phaseTitle">最后才进入主动回忆。名词第一次不用强求冠词完全正确，系统会把完整形式再展示给你。</div><div class="learnZh">${Lesc(Lmeaning(c))}</div><div class="learnEn">${LhasZh(c)?Lesc(Lenglish(c)):""}</div><div class="answerBox" style="margin-top:18px"><input id="learnAnswer" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="done" placeholder="输入德语…"><button class="primary" id="learnSubmit">检查</button><button class="secondary" id="learnShow">不会 / 看答案</button></div>${LcharBar("learnAnswer")}`;const input=L$("learnAnswer");L$("learnSubmit").onclick=()=>{input.blur();LcheckSpell(c,false)};L$("learnShow").onclick=()=>{input.blur();LcheckSpell(c,true)};input.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();input.blur();LcheckSpell(c,false)}});setTimeout(()=>{try{input.focus({preventScroll:true})}catch(e){input.focus()}},80)}
-function LspellAccepted(c,input){const a=Lnorm(input),t=Lnorm(c.de);if(a===t)return true;if(LisNoun(c)&&LwithoutArticle(a)===LwithoutArticle(t))return true;return a.replace(/\s/g,"")===t.replace(/\s/g,"")}
+// A noun may be typed without its article and a reflexive verb with or without
+// its sich: both are forms the card itself teaches but the headword cannot hold.
+// Reflexives used to be scored against the bare `freuen`, so anyone who had
+// actually absorbed the `sich freuen` the meaning column shows them was marked
+// wrong for knowing more — across every reflexive verb in the deck.
+function LspellAccepted(c,input){const a=Lnorm(input),t=Lnorm(c.de);
+ if(a===t)return true;
+ if(LisNoun(c)&&LwithoutArticle(a)===LwithoutArticle(t))return true;
+ if(LisReflexive(c)&&LwithoutSich(a)===LwithoutSich(t))return true;
+ return a.replace(/\s/g,"")===t.replace(/\s/g,"")}
 function LcheckSpell(c,show){if(learnAnswered)return;const input=L$("learnAnswer"),v=input.value.trim();if(!show&&!v)return;learnAnswered=true;const ok=!show&&LspellAccepted(c,v);LwrongSpellResult(c,v,show,ok);Lrecord(c,ok,"spell");Lfeedback(c,ok);L$("learnSubmit").disabled=L$("learnShow").disabled=true;L$("learnNextBtn").style.display="";Lbring(L$("learnNextBtn"),"end")}
 const LAPSE_MS=10*60*1000;
 function Lrecord(c,ok,type){const s=Lstate(c);s.introduced=true;s.last=Date.now();if(ok){learnCorrect++;if(type==="spell"){s.strength=Math.min(5,(s.strength||0)+2);s.spellingPass=true;s.cycles=(s.cycles||0)+1}else{s.strength=Math.min(5,(s.strength||0)+1);if(!learnSpelling&&type==="reverse")s.cycles=(s.cycles||0)+1}s.due=Date.now()+Linterval(s)}else{s.wrong=(s.wrong||0)+1;s.lapses=(s.lapses||0)+1;s.strength=Math.max(0,(s.strength||0)-1);s.cycles=Math.max(0,(s.cycles||0)-1);if(type==="spell")s.spellingPass=false;s.known=false;s.due=Date.now()+LAPSE_MS}Lsave(c,s)}

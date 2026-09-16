@@ -64,8 +64,62 @@ function LpluralAlts(c) {
   return [...alts];
 }
 
+// ---- haben / sein ----------------------------------------------------------
+// The word lists already spell the perfect out: whatever follows the final comma
+// in the grammar column is the auxiliary and the participle. Nothing has ever
+// tested it, and it is the one ending a native ear catches instantly — "Ich habe
+// gegangen" lands wrong the way a scrambled sentence does. Guessing is weak cover
+// too: unlike der/die/das there are only two answers, so knowing beats guessing
+// within a round.
+function LauxOf(c) {
+  const m = (c.grammar || "").trim().match(/,\s*(hat|ist)\s+(\S.*)$/);
+  return m ? { aux: m[1] === "hat" ? "haben" : "sein", part: m[2].trim() } : null;
+}
+const LauxCards = () => CARDS.filter(c => !Lmastered(Lstate(c)) && LauxOf(c));
+
+// ---- cloze -----------------------------------------------------------------
+// Blanking a word out of its own example turns sentences the app only ever
+// printed into recall practice. The word is usually inflected where it stands
+// (gehen shows up as "gehe", international as "internationalen"), so the span is
+// located by stem and the blank covers whichever form is actually there.
+//
+// The stem has to be long enough to be worth matching by prefix: "an" would
+// happily blank the "An" of "Anna". Anything that cannot be located — separable
+// verbs split across the clause, strong stem changes like sein → bin — simply
+// gets no question rather than a wrong one.
+const LclozeStem = c => c.de.replace(/^(der|die|das)\s+/i, "").replace(/^sich\s+/i, "").trim();
+const Lrx = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function LclozeSpan(c) {
+  const sent = LexampleDe(c), stem = LclozeStem(c);
+  if (!sent || !stem || /[\s|/]/.test(stem)) return null;
+  const root = stem.replace(/(en|n)$/i, "");
+  const tries = [new RegExp("(^|[^\\p{L}])(" + Lrx(stem) + ")([^\\p{L}]|$)", "iu")];
+  if (stem.length >= 4 && root.length >= 3) tries.push(new RegExp("(^|[^\\p{L}])(" + Lrx(root) + "\\p{L}*)", "iu"));
+  for (const rx of tries) {
+    const m = rx.exec(sent);
+    if (!m || m[2].length < 3) continue;
+    const at = m.index + m[1].length;
+    return { before: sent.slice(0, at), word: m[2], after: sent.slice(at + m[2].length) };
+  }
+  return null;
+}
+const LclozeCards = () => CARDS.filter(c => !Lmastered(Lstate(c)) && LclozeSpan(c));
+// The exercise asks which word belongs here, not how to inflect it, so the
+// dictionary form counts as much as the form the sentence happens to use.
+function LclozeAccepted(c, span, input) {
+  const n = s => Lnorm(s).replace(/^(der|die|das)\s+/, "").replace(/^sich\s+/, "");
+  return [span.word, LclozeStem(c), c.de].some(w => n(input) === n(w));
+}
+
+function LdrillPoolFor(kind) {
+  return kind === "plural" ? LdrillPluralNouns()
+    : kind === "dictation" ? LdictationCards()
+    : kind === "aux" ? LauxCards()
+    : kind === "cloze" ? LclozeCards()
+    : LdrillNouns();
+}
 function LdrillPool() {
-  const base = drillKind === "plural" ? LdrillPluralNouns() : drillKind === "dictation" ? LdictationCards() : LdrillNouns();
+  const base = LdrillPoolFor(drillKind);
   return drillLevel === "ALL" ? base : base.filter(c => c.level === drillLevel);
 }
 // Unseen first, then whatever is currently being missed.
@@ -77,7 +131,7 @@ function LdrillPick(n) {
 
 function LdrillStyles() {
   const st = document.createElement("style");
-  st.textContent = `.drillOverlay{position:fixed;inset:0;z-index:9997;background:rgba(18,25,38,.58);display:flex;align-items:flex-end;justify-content:center}.drillOverlay.hidden{display:none}.drillSheet{background:#fff;width:min(760px,100%);max-height:92vh;border-radius:22px 22px 0 0;padding:18px;overflow:auto;box-shadow:0 -16px 50px rgba(0,0,0,.18)}.drillHead{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:-18px;background:#fff;padding:16px 0 10px;z-index:2}.drillHead h2{margin:0;font-size:24px}.drillTabs{display:flex;gap:8px;margin-bottom:12px}.drillTabs button{flex:1}.drillTabs button.on{background:var(--accent);color:#fff}.drillWord{font-size:clamp(30px,8vw,46px);font-weight:800;text-align:center;margin:26px 0 6px;word-break:break-word}.drillHint{text-align:center;color:var(--muted);font-size:13px;margin-bottom:22px}.genderGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.genderGrid button{padding:20px 0;font-size:21px;font-weight:800}.genderGrid button.correct{background:#0a8f55;color:#fff}.genderGrid button.wrong{background:#c73737;color:#fff}.drillStats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.drillEmpty{text-align:center;padding:45px 10px;color:var(--muted)}.drillBreak{display:grid;gap:6px;margin-top:10px;font-size:13px;color:var(--muted)}.drillRow{display:flex;justify-content:space-between;gap:10px;padding:7px 10px;border:1px solid var(--line);border-radius:10px}@media(min-width:700px){.drillOverlay{align-items:center;padding:18px}.drillSheet{border-radius:22px;max-height:88vh}}`;
+  st.textContent = `.drillOverlay{position:fixed;inset:0;z-index:9997;background:rgba(18,25,38,.58);display:flex;align-items:flex-end;justify-content:center}.drillOverlay.hidden{display:none}.drillSheet{background:#fff;width:min(760px,100%);max-height:92vh;border-radius:22px 22px 0 0;padding:18px;overflow:auto;box-shadow:0 -16px 50px rgba(0,0,0,.18)}.drillHead{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:-18px;background:#fff;padding:16px 0 10px;z-index:2}.drillHead h2{margin:0;font-size:24px}.drillTabs{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}.drillTabs button{flex:1 1 30%;padding:10px 6px;font-size:13px}.genderGrid.two{grid-template-columns:repeat(2,1fr)}.clozeSentence{font-size:clamp(18px,4.4vw,24px);line-height:1.8;text-align:center;margin:22px 0 8px;font-weight:650;word-break:break-word}.clozeBlank{display:inline-block;min-width:92px;border-bottom:3px solid var(--accent)}.clozeHit{color:var(--accent)}.drillTabs button.on{background:var(--accent);color:#fff}.drillWord{font-size:clamp(30px,8vw,46px);font-weight:800;text-align:center;margin:26px 0 6px;word-break:break-word}.drillHint{text-align:center;color:var(--muted);font-size:13px;margin-bottom:22px}.genderGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.genderGrid button{padding:20px 0;font-size:21px;font-weight:800}.genderGrid button.correct{background:#0a8f55;color:#fff}.genderGrid button.wrong{background:#c73737;color:#fff}.drillStats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.drillEmpty{text-align:center;padding:45px 10px;color:var(--muted)}.drillBreak{display:grid;gap:6px;margin-top:10px;font-size:13px;color:var(--muted)}.drillRow{display:flex;justify-content:space-between;gap:10px;padding:7px 10px;border:1px solid var(--line);border-radius:10px}@media(min-width:700px){.drillOverlay{align-items:center;padding:18px}.drillSheet{border-radius:22px;max-height:88vh}}`;
   document.head.appendChild(st);
 }
 function LbuildDrillUI() {
@@ -95,38 +149,53 @@ function LcloseDrill() { L$("drillOverlay").classList.add("hidden"); Lstats(); L
 
 function LdrillAccuracy(kind, filter) {
   let n = 0, ok = 0;
-  for (const c of LdrillNouns()) {
+  // Counted over nouns regardless of drill, which quietly reported dictation
+  // accuracy over a set dictation never draws from.
+  for (const c of LdrillPoolFor(kind)) {
     if (filter && !filter(c)) continue;
     const s = LdrillState(c.id, kind);
     n += s.n; ok += s.ok;
   }
   return { n, ok, pct: n ? Math.round(ok / n * 100) : null };
 }
+const LDRILLS = [
+  { kind: "gender", id: "tabGender", tab: "der / die / das" },
+  { kind: "plural", id: "tabPlural", tab: "复数形式" },
+  { kind: "aux", id: "tabAux", tab: "haben / sein" },
+  { kind: "cloze", id: "tabCloze", tab: "例句填空" },
+  { kind: "dictation", id: "tabDictation", tab: "听写" },
+];
+function LdrillBlurb(kind, n) {
+  if (kind === "gender") return `<b>性别专项 · 可练 ${n} 个名词。</b> 拼写检查默认不强制冠词，所以性别几乎没被单独考过。已掌握的词不会出现。`;
+  if (kind === "plural") return `<b>复数专项 · 可练 ${n} 个名词。</b> 复数形式由词库的词形记号推导（<code>"</code> 表示变音），无法确定的词不会出题。`;
+  if (kind === "aux") return `<b>haben / sein · 可练 ${n} 个动词。</b> 完成时该用哪个助动词，词形栏里早就写着（<code>ist gegangen</code>），但从来没考过。大体上位移和状态变化用 sein，其余用 haben —— 例外只能靠练出来。`;
+  if (kind === "cloze") return `<b>例句填空 · 可练 ${n} 个词。</b> 把词从它自己的例句里挖掉，看着句子写回去。原形和句子里的变化形式都算对。`;
+  return `<b>听写 · 可练 ${n} 个词。</b> 听德语写出来，先不给中文。${LhasGermanVoice() ? "" : "<br><b>注意：这台设备没有德语语音</b>，朗读会带口音甚至读错，建议先在系统里装一个德语语音。"}`;
+}
+// One overall figure flatters the learner whenever an answer is much commoner
+// than the rest: guessing "die" alone scores about 45%. Both drills with a
+// lopsided answer set are broken out per answer instead.
+function LdrillRow(label, total, stat) {
+  return `<div class="drillRow"><span><b>${label}</b> · 词库 ${total}</span><span>${stat.n ? `${stat.pct}% （${stat.ok}/${stat.n}）` : "还没练过"}</span></div>`;
+}
+function LdrillBreakdown() {
+  if (drillKind === "gender") return ["der", "die", "das"]
+    .map(a => LdrillRow(a, LdrillNouns().filter(c => LdrillArticle(c) === a).length, LdrillAccuracy("gender", c => LdrillArticle(c) === a))).join("");
+  if (drillKind === "aux") return ["haben", "sein"]
+    .map(a => LdrillRow(a, LauxCards().filter(c => LauxOf(c).aux === a).length, LdrillAccuracy("aux", c => LauxOf(c).aux === a))).join("");
+  const s = LdrillAccuracy(drillKind), label = drillKind === "plural" ? "复数" : drillKind === "cloze" ? "例句填空" : "听写";
+  return `<div class="drillRow"><span>${label}练习准确率</span><span>${s.n ? `${s.pct}% （${s.ok}/${s.n}）` : "还没练过"}</span></div>`;
+}
 function LrenderDrillHome() {
   const box = L$("drillContent"), pool = LdrillPool();
-  const genderOn = drillKind === "gender", pluralOn = drillKind === "plural", dictOn = drillKind === "dictation";
-  // Guessing "die" alone scores about 45%, so a single overall figure flatters
-  // the learner. Accuracy is broken out per article instead.
-  const perArticle = ["der", "die", "das"].map(a => {
-    const s = LdrillAccuracy("gender", c => LdrillArticle(c) === a);
-    const total = LdrillNouns().filter(c => LdrillArticle(c) === a).length;
-    return `<div class="drillRow"><span><b>${a}</b> · 词库 ${total}</span><span>${s.n ? `${s.pct}% （${s.ok}/${s.n}）` : "还没练过"}</span></div>`;
-  }).join("");
-  const plural = LdrillAccuracy("plural");
-  box.innerHTML = `<div class="drillTabs"><button class="secondary ${genderOn ? "on" : ""}" id="tabGender">der / die / das</button><button class="secondary ${pluralOn ? "on" : ""}" id="tabPlural">复数形式</button><button class="secondary ${dictOn ? "on" : ""}" id="tabDictation">听写</button></div>
-<div class="coverage">${genderOn
-    ? `<b>性别专项 · 可练 ${pool.length} 个名词。</b> 拼写检查默认不强制冠词，所以性别几乎没被单独考过。已掌握的词不会出现。`
-    : pluralOn
-    ? `<b>复数专项 · 可练 ${pool.length} 个名词。</b> 复数形式由词库的词形记号推导（<code>"</code> 表示变音），无法确定的词不会出题。`
-    : `<b>听写 · 可练 ${pool.length} 个词。</b> 听德语写出来，先不给中文。${LhasGermanVoice() ? "" : "<br><b>注意：这台设备没有德语语音</b>，朗读会带口音甚至读错，建议先在系统里装一个德语语音。"}`}</div>
+  box.innerHTML = `<div class="drillTabs">${LDRILLS.map(d => `<button class="secondary ${d.kind === drillKind ? "on" : ""}" id="${d.id}" data-kind="${d.kind}">${d.tab}</button>`).join("")}</div>
+<div class="coverage">${LdrillBlurb(drillKind, pool.length)}</div>
 <label style="margin:12px 0 4px">级别<select id="drillLevel">${LlevelChoices()}</select></label>
-<div class="drillBreak">${genderOn ? perArticle : `<div class="drillRow"><span>${pluralOn ? "复数" : "听写"}练习准确率</span><span>${(() => { const s = LdrillAccuracy(drillKind); return s.n ? `${s.pct}% （${s.ok}/${s.n}）` : "还没练过" })()}</span></div>`}</div>
+<div class="drillBreak">${LdrillBreakdown()}</div>
 <div class="wrongActions" style="margin-top:14px"><button class="primary" id="drillStart" ${pool.length ? "" : "disabled"}>开始 20 题</button></div>`;
   L$("drillLevel").value = drillLevel;
   L$("drillLevel").onchange = e => { drillLevel = e.target.value; DWStore.prefs({ drillLevel }); LrenderDrillHome() };
-  L$("tabGender").onclick = () => { drillKind = "gender"; DWStore.prefs({ drill: drillKind }); LrenderDrillHome() };
-  L$("tabPlural").onclick = () => { drillKind = "plural"; DWStore.prefs({ drill: drillKind }); LrenderDrillHome() };
-  L$("tabDictation").onclick = () => { drillKind = "dictation"; DWStore.prefs({ drill: drillKind }); LrenderDrillHome() };
+  box.querySelectorAll(".drillTabs button").forEach(b => b.onclick = () => { drillKind = b.dataset.kind; DWStore.prefs({ drill: drillKind }); LrenderDrillHome() });
   L$("drillStart").onclick = LstartDrill;
 }
 function LstartDrill() { drillQueue = LdrillPick(20); drillPos = 0; drillScore = 0; drillAnswered = false; LrenderDrill() }
@@ -154,6 +223,18 @@ function LrenderDrill() {
   } else if (drillKind === "gender") {
     box.innerHTML = `${head}<div class="drillWord">${Lesc(LdrillStem(c))}</div><div class="drillHint">${Lesc(LhasZh(c) ? Lmeaning(c) : Lenglish(c))}</div><div class="genderGrid">${["der", "die", "das"].map(a => `<button class="secondary" data-a="${a}">${a}</button>`).join("")}</div><div id="drillFeedback"></div>`;
     document.querySelectorAll("#drillContent .genderGrid button").forEach(b => b.onclick = () => LanswerGender(c, b.dataset.a));
+  } else if (drillKind === "aux") {
+    const a = LauxOf(c);
+    box.innerHTML = `${head}<div class="drillWord">___ ${Lesc(a.part)}</div><div class="drillHint">${Lesc(c.de)} · ${Lesc(LhasZh(c) ? Lmeaning(c) : Lenglish(c))}<br>完成时用哪个助动词？</div><div class="genderGrid two">${["haben", "sein"].map(x => `<button class="secondary" data-a="${x}">${x}</button>`).join("")}</div><div id="drillFeedback"></div>`;
+    document.querySelectorAll("#drillContent .genderGrid button").forEach(b => b.onclick = () => LanswerAux(c, b.dataset.a));
+  } else if (drillKind === "cloze") {
+    const span = LclozeSpan(c);
+    box.innerHTML = `${head}<div class="drillHint">把句子补完整</div><div class="clozeSentence">${Lesc(span.before)}<span class="clozeBlank"></span>${Lesc(span.after)}</div><div class="drillHint">${Lesc(LhasZh(c) ? Lmeaning(c) : Lenglish(c))}</div><div class="wrongPracticeBox"><input id="drillAnswer" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="done" placeholder="填进去的词…">${LcharBar("drillAnswer")}<div class="wrongActions"><button class="primary" id="drillCheck">检查</button><button class="secondary" id="drillShow">看答案</button></div></div><div id="drillFeedback"></div>`;
+    const input = L$("drillAnswer");
+    L$("drillCheck").onclick = () => LanswerCloze(c, false);
+    L$("drillShow").onclick = () => LanswerCloze(c, true);
+    input.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); LanswerCloze(c, false) } });
+    setTimeout(() => input.focus(), 60);
   } else {
     box.innerHTML = `${head}<div class="drillWord">${Lesc(c.de)}</div><div class="drillHint">${Lesc(LhasZh(c) ? Lmeaning(c) : Lenglish(c))} · 写出复数形式</div><div class="wrongPracticeBox"><input id="drillAnswer" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="done" placeholder="die …">${LcharBar("drillAnswer")}<div class="wrongActions"><button class="primary" id="drillCheck">检查</button><button class="secondary" id="drillShow">看答案</button></div></div><div id="drillFeedback"></div>`;
     const input = L$("drillAnswer");
@@ -208,6 +289,33 @@ function LanswerPlural(c, show) {
   LdrillSave(c.id, "plural", ok);
   input.disabled = L$("drillCheck").disabled = L$("drillShow").disabled = true;
   LdrillNext(ok, `<div class="answerRow"><div class="deAnswer">${Lesc(want)}</div>${LspeakBtn(want)}</div>${alts.length > 1 ? `<div class="meta">也可以是：${alts.filter(a => a !== want).map(Lesc).join(" / ")}</div>` : ""}<div class="meta">单数：${Lesc(c.de)}${c.grammar ? ` · 词形记号 ${Lesc(c.grammar)}` : ""}</div>${!ok && !show && v ? `<div class="wrongInput">你写的是：${Lesc(v)}</div>` : ""}`);
+}
+
+function LanswerAux(c, picked) {
+  if (drillAnswered) return;
+  drillAnswered = true;
+  const a = LauxOf(c), ok = picked === a.aux;
+  if (ok) drillScore++;
+  LdrillSave(c.id, "aux", ok);
+  document.querySelectorAll("#drillContent .genderGrid button").forEach(b => {
+    b.disabled = true;
+    if (b.dataset.a === a.aux) b.classList.add("correct");
+    else if (b.dataset.a === picked) b.classList.add("wrong");
+  });
+  const perfect = `er ${a.aux === "haben" ? "hat" : "ist"} ${a.part}`;
+  LdrillNext(ok, `<div class="answerRow"><div class="deAnswer">${Lesc(perfect)}</div>${LspeakBtn(perfect)}</div><div class="meta">${Lesc(c.de)} · ${Lesc(LhasZh(c) ? Lmeaning(c) : Lenglish(c))}</div><div class="meta">词形：${Lesc(c.grammar)}</div>`);
+}
+function LanswerCloze(c, show) {
+  if (drillAnswered) return;
+  const input = L$("drillAnswer"), v = input.value.trim();
+  if (!show && !v) return;
+  drillAnswered = true;
+  const span = LclozeSpan(c), ok = !show && LclozeAccepted(c, span, v);
+  if (ok) drillScore++;
+  LdrillSave(c.id, "cloze", ok);
+  input.disabled = L$("drillCheck").disabled = L$("drillShow").disabled = true;
+  const full = LexampleDe(c), zh = LexampleZh(c);
+  LdrillNext(ok, `<div class="clozeSentence">${Lesc(span.before)}<b class="clozeHit">${Lesc(span.word)}</b>${Lesc(span.after)} ${LspeakBtn(full)}</div>${zh ? `<div class="meta">${Lesc(zh)}</div>` : ""}<div class="meta">词条：${Lesc(c.de)}</div>${!ok && !show && v ? `<div class="wrongInput">你写的是：${Lesc(v)}</div>` : ""}`);
 }
 
 function LinitDrillUI() {

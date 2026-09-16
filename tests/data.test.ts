@@ -378,3 +378,130 @@ describe('word insight', () => {
     expect(explained).toBeGreaterThan(25);
   });
 });
+
+// The word lists carry more than a meaning per word: a reflexive verb's `sich`,
+// a verb's auxiliary, a sentence the word appears in. Each of these used to be
+// printed and never checked, and the first of them was actively scored wrong.
+describe('what the grammar and example columns encode', () => {
+  const DWStoreStub = { KEYS: { LEARN: 'l' }, read: () => ({}), onMigrated: () => {}, prefs: () => ({}), queue: () => {} };
+  const documentStub = { addEventListener: () => {} };
+  type Card = { de: string; zh?: string; en?: string; grammar?: string; example?: string };
+  const learn = load<{
+    LspellAccepted(c: Card, input: string): boolean;
+    LisReflexive(c: Card): boolean;
+    LexampleDe(c: Card): string;
+    LexampleZh(c: Card): string;
+    Lnorm(s: string): string;
+  }>('learn.core.js', '{ LspellAccepted, LisReflexive, LexampleDe, LexampleZh, Lnorm }',
+    { DWStore: DWStoreStub, document: documentStub });
+
+  type Span = { before: string; word: string; after: string };
+  const drills = load<{
+    LauxOf(c: Card): { aux: string; part: string } | null;
+    LclozeSpan(c: Card): Span | null;
+    LclozeAccepted(c: Card, span: Span, input: string): boolean;
+  }>('drills-addon.js', '{ LauxOf, LclozeSpan, LclozeAccepted }',
+    { DWStore: DWStoreStub, document: documentStub, LexampleDe: learn.LexampleDe, Lnorm: learn.Lnorm });
+
+  describe('reflexive verbs', () => {
+    // `sich` is shown in the meaning column and nowhere else, so scoring against
+    // `de` alone marked a learner wrong for writing the form the card taught.
+    const freuen: Card = { de: 'freuen', zh: '（sich auf +A）期待', en: 'to be pleased' };
+
+    it('accepts the sich the card itself teaches', () => {
+      expect(learn.LspellAccepted(freuen, 'sich freuen')).toBe(true);
+    });
+
+    it('still accepts the bare infinitive, which is what `de` holds', () => {
+      expect(learn.LspellAccepted(freuen, 'freuen')).toBe(true);
+    });
+
+    it('accepts either way round when a deck does put sich in the headword', () => {
+      const other: Card = { de: 'sich erinnern', zh: '记得' };
+      expect(learn.LspellAccepted(other, 'erinnern')).toBe(true);
+      expect(learn.LspellAccepted(other, 'sich erinnern')).toBe(true);
+    });
+
+    it('does not hand out sich to a verb that is not reflexive', () => {
+      const kaufen: Card = { de: 'kaufen', zh: '买', en: 'to buy' };
+      expect(learn.LisReflexive(kaufen)).toBe(false);
+      expect(learn.LspellAccepted(kaufen, 'sich kaufen')).toBe(false);
+    });
+
+    it('is not fooled into accepting a different verb', () => {
+      expect(learn.LspellAccepted(freuen, 'sich fahren')).toBe(false);
+    });
+  });
+
+  describe('the auxiliary', () => {
+    it('reads haben or sein off the end of the grammar column', () => {
+      expect(drills.LauxOf({ de: 'gehen', grammar: 'er geht, ist gegangen' }))
+        .toEqual({ aux: 'sein', part: 'gegangen' });
+      expect(drills.LauxOf({ de: 'kaufen', grammar: 'er kauft, hat gekauft' }))
+        .toEqual({ aux: 'haben', part: 'gekauft' });
+    });
+
+    it('takes the last form when a B1 entry also lists the Präteritum', () => {
+      expect(drills.LauxOf({ de: 'verschwinden', grammar: 'er verschwindet, verschwand, ist verschwunden' }))
+        .toEqual({ aux: 'sein', part: 'verschwunden' });
+    });
+
+    it('keeps a participle that is more than one word', () => {
+      expect(drills.LauxOf({ de: 'ernst nehmen', grammar: 'er nimmt ernst, nahm ernst, hat ernst genommen' }))
+        .toEqual({ aux: 'haben', part: 'ernst genommen' });
+    });
+
+    it('asks nothing of a word whose perfect is not written down', () => {
+      expect(drills.LauxOf({ de: 'die Tür', grammar: '-en' })).toBe(null);
+      expect(drills.LauxOf({ de: 'schnell' })).toBe(null);
+      // An impersonal entry spells the subject out again, so there is no clean
+      // auxiliary to ask for.
+      expect(drills.LauxOf({ de: 'geben', grammar: 'es gibt, es hat gegeben' })).toBe(null);
+    });
+  });
+
+  describe('blanking a word out of its own example', () => {
+    const span = (c: Card) => drills.LclozeSpan(c);
+
+    it('finds the word where it stands unchanged', () => {
+      expect(span({ de: 'die Blume', example: 'Die Blume ist schön.（这朵花很美。）' }))
+        .toEqual({ before: 'Die ', word: 'Blume', after: ' ist schön.' });
+    });
+
+    it('covers the whole inflected form, not just the stem', () => {
+      expect(span({ de: 'international', example: 'Frankfurt hat einen internationalen Flughafen.（…）' })?.word)
+        .toBe('internationalen');
+      expect(span({ de: 'kaufen', example: 'Ich kaufe ein Brot.（我买一个面包。）' })?.word).toBe('kaufe');
+    });
+
+    // A wrong blank is worse than no question: it asks for a word that is not
+    // the one missing.
+    it('says nothing when the word is not recoverable from the sentence', () => {
+      // separable verb, split across the clause
+      expect(span({ de: 'zuordnen', example: 'Ordnen Sie die Bilder zu.（请把图片配对。）' })).toBe(null);
+      // strong stem change
+      expect(span({ de: 'sein', example: 'Hallo, ich bin Julia.（…）' })).toBe(null);
+      expect(span({ de: 'die Tür', example: '' })).toBe(null);
+    });
+
+    it('will not blank a two-letter word out of the middle of a longer one', () => {
+      // "an" must not swallow the "An" of "Anna"
+      expect(span({ de: 'an', example: 'Ich heiße Anna.（我叫安娜。）' })).toBe(null);
+    });
+
+    it('takes the dictionary form or the form the sentence uses', () => {
+      const c: Card = { de: 'kaufen', example: 'Ich kaufe ein Brot.（我买一个面包。）' };
+      const s = span(c)!;
+      expect(drills.LclozeAccepted(c, s, 'kaufe')).toBe(true);
+      expect(drills.LclozeAccepted(c, s, 'kaufen')).toBe(true);
+      expect(drills.LclozeAccepted(c, s, 'trinke')).toBe(false);
+    });
+
+    it('splits the two languages the example field packs together', () => {
+      const c: Card = { de: 'die Blume', example: 'Die Blume ist schön.（这朵花很美。）' };
+      expect(learn.LexampleDe(c)).toBe('Die Blume ist schön.');
+      expect(learn.LexampleZh(c)).toBe('这朵花很美。');
+      expect(learn.LexampleZh({ de: 'x', example: 'Nur Deutsch.' })).toBe('');
+    });
+  });
+});
