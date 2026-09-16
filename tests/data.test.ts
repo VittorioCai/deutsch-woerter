@@ -591,3 +591,71 @@ describe('when a word comes back', () => {
     expect(LtomorrowCount()).toBe(1);
   });
 });
+
+// A word can mean something different in the chapter you met it in, and the deck
+// marks that with a 这里：/ hier: prefix. Among four options it was a tell.
+describe('a chapter-specific sense', () => {
+  const documentStub = { addEventListener: () => {} };
+  type C = { id?: string; level?: string; chapter?: string; de: string; zh?: string; en?: string };
+  const opts = (cards: C[] = []) =>
+    load<{
+      LsenseFree(s: string): string;
+      LoptionEn(c: C): string;
+      Ldistractors(c: C, count?: number, labelOf?: (c: C) => string): C[];
+    }>('learn.core.js', '{ LsenseFree, LoptionEn, Ldistractors }', {
+      DWStore: { KEYS: { LEARN: 'l' }, read: () => ({}), onMigrated: () => {}, prefs: () => ({}), queue: () => {} },
+      document: documentStub, CARDS: cards,
+    });
+
+  it('drops the marker, wherever in the meaning it sits', () => {
+    const { LsenseFree } = opts();
+    expect(LsenseFree('这里：情况还好；进行得顺利')).toBe('情况还好；进行得顺利');
+    expect(LsenseFree('还；仍然；这里：任何')).toBe('还；仍然；任何');
+    expect(LsenseFree('hier: to be okay')).toBe('to be okay');
+    expect(LsenseFree('yet, even, hier: any')).toBe('yet, even, any');
+  });
+
+  it('leaves alone the words that merely look like the marker', () => {
+    const { LsenseFree, LoptionEn } = opts();
+    // the entry for the word hier is itself 这里, with no colon
+    expect(LsenseFree('这里')).toBe('这里');
+    expect(LsenseFree('hierarchical')).toBe('hierarchical');
+    expect(LoptionEn({ de: 'hierarchisch', en: 'hierarchical' })).toBe('hierarchical');
+    // and a meaning that is nothing but the marker keeps something to show
+    expect(LsenseFree('这里：')).toBe('这里：');
+  });
+
+  // Removing the tell exposed a question with two right answers, which the tell
+  // had been hiding: both entries for gehen are correct meanings of gehen.
+  it('never offers another sense of the same word as a wrong answer', () => {
+    const cards: C[] = [
+      { id: 'g1', level: 'A1', chapter: '1', de: 'gehen', en: 'to go' },
+      { id: 'g2', level: 'A1', chapter: '1', de: 'gehen', en: 'hier: to be okay' },
+      { id: 'k', level: 'A1', chapter: '1', de: 'kaufen', en: 'to buy' },
+      { id: 'l', level: 'A1', chapter: '1', de: 'lesen', en: 'to read' },
+      { id: 's', level: 'A1', chapter: '1', de: 'sehen', en: 'to see' },
+      { id: 't', level: 'A1', chapter: '1', de: 'trinken', en: 'to drink' },
+    ];
+    const { Ldistractors } = opts(cards);
+    for (const target of [cards[0], cards[1]]) {
+      const picked = Ldistractors(target);
+      expect(picked).toHaveLength(3);
+      expect(picked.map((x) => x.de)).not.toContain('gehen');
+    }
+  });
+
+  it('still separates two options that only differ by the marker', () => {
+    // stripping must not be able to produce two identical buttons
+    const cards: C[] = [
+      { id: 'a', level: 'A1', chapter: '1', de: 'laufen', en: 'hier: to run' },
+      { id: 'b', level: 'A1', chapter: '1', de: 'rennen', en: 'to run' },
+      { id: 'c', level: 'A1', chapter: '1', de: 'kaufen', en: 'to buy' },
+      { id: 'd', level: 'A1', chapter: '1', de: 'lesen', en: 'to read' },
+      { id: 'e', level: 'A1', chapter: '1', de: 'sehen', en: 'to see' },
+    ];
+    const { Ldistractors, LoptionEn } = opts(cards);
+    const picked = Ldistractors(cards[0]);
+    expect(picked.map((x) => x.de)).not.toContain('rennen');
+    expect(new Set([cards[0], ...picked].map(LoptionEn)).size).toBe(4);
+  });
+});

@@ -17,6 +17,12 @@ const LwithoutSich=s=>Lnorm(s).replace(/^sich\s+/,"");
 // sentence can be shown, hidden or spoken half at a time.
 const LexampleDe=c=>String(c.example||"").split("（")[0].trim();
 const LexampleZh=c=>{const m=String(c.example||"").match(/（([^）]*)）\s*$/);return m?m[1]:""};
+// The deck marks a chapter-specific sense with a 这里：/ hier: prefix. That is a
+// note about the word rather than part of its meaning, and among four options it
+// is a tell — the one carrying it is the answer, every single time. A colon is
+// required, so the entry for the word `hier` itself （zh 就是「这里」）and words
+// like `hierarchisch` are left alone.
+const LsenseFree=s=>{const t=String(s||"").replace(/(?:这里|此处)\s*[：:]\s*/g,"").replace(/\bhier\s*:\s*/gi,"").trim();return t||String(s||"")};
 const Lclean=s=>(s||"").replace(/^[_\-–—\s]+/,"").replace(/\s*\([^)]*\)\s*$/," ").trim();
 const Lshuffle=a=>a.map(v=>({v,r:Math.random()})).sort((a,b)=>a.r-b.r).map(x=>x.v);
 const LDE_CHARS=["ä","ö","ü","ß","Ä","Ö","Ü"];
@@ -34,6 +40,8 @@ function Lsave(c,s){learnProgress[c.id]=s;DWStore.queue(LEARN_KEY,()=>learnProgr
 function Lmeaning(c){return ZH[c.id]||Lclean(c.en)}
 function Lenglish(c){return Lclean(c.en)}
 function LhasZh(c){return !!ZH[c.id]}
+const LoptionZh=c=>LsenseFree(Lmeaning(c));
+const LoptionEn=c=>LsenseFree(Lenglish(c));
 function LmeaningMeta(c){return LhasZh(c)&&Lenglish(c)?`英文：${Lenglish(c)}`:""}
 function LallLearningCards(){return CARDS}
 function Lscope(){const level=L$("learnLevel")?.value||"A1",chapter=L$("learnChapter")?.value||"1";return {level,chapter}}
@@ -96,8 +104,11 @@ function Lshow(name){L$("homeView").classList.toggle("hidden",name!=="home");L$(
 function LmakeQueue(cards,review=false,spot=null){const q=[],groupSize=5;for(let i=0;i<cards.length;i+=groupSize){const g=cards.slice(i,i+groupSize);if(spot){Lshuffle(g).forEach(c=>q.push({type:spot,c,spot:true}));continue}if(!review)g.forEach(c=>q.push({type:"intro",c}));Lshuffle(g).forEach(c=>q.push({type:"recognize",c}));Lshuffle(g).forEach(c=>q.push({type:"reverse",c}));if(learnSpelling)Lshuffle(g).forEach(c=>q.push({type:"spell",c}))}return q}
 function Lstart(review=false){learnToday=false;const cs=Lcards(),now=Date.now();let selected;if(review){selected=cs.filter(c=>{const s=Lstate(c);return s.introduced&&!Lmastered(s)&&(s.due||0)<=now});if(!selected.length){alert(`${LscopeLabel()} 现在没有到期需要复习的词。可以继续学新词。`);return}selected=selected.slice(0,Math.max(5,+L$("learnCount").value));learnRoundNew=0}else{selected=cs.filter(c=>{const s=Lstate(c);return !s.introduced&&!s.known}).slice(0,+L$("learnCount").value);if(!selected.length){alert(`${LscopeLabel()} 的新词已经学完了，可以复习到期词，或者切换章节。`);return}learnRoundNew=selected.length}learnQueue=LmakeQueue(selected,review);learnPos=0;learnCorrect=0;learnAnswered=false;Lrender();Lbring(L$("learnCard"),"start")}
 function Llabel(type){return type==="intro"?"认识新词":type==="recognize"?"第 1 层 · 看德语懂意思":type==="reverse"?"第 2 层 · 看意思认出德语":"第 3 层 · 主动拼写"}
-function Ldistractors(c,count=3,labelOf=Lmeaning){const seen=new Set([c.id]),labels=new Set([Lnorm(labelOf(c))]),cs=[];
-const take=x=>{if(seen.has(x.id))return false;const l=Lnorm(labelOf(x));if(!l||labels.has(l))return false;seen.add(x.id);labels.add(l);cs.push(x);return true};
+// Two entries for the same headword are two senses of one word, so offering one
+// as the wrong answer to the other asks a question with two right answers. That
+// went unnoticed while the 这里 prefix was giving the answer away anyway.
+function Ldistractors(c,count=3,labelOf=LoptionZh){const seen=new Set([c.id]),labels=new Set([Lnorm(labelOf(c))]),cs=[];
+const take=x=>{if(seen.has(x.id)||Lnorm(x.de)===Lnorm(c.de))return false;const l=Lnorm(labelOf(x));if(!l||labels.has(l))return false;seen.add(x.id);labels.add(l);cs.push(x);return true};
 for(const t of learnQueue){if(cs.length>=count)break;if(Lstate(t.c).introduced)take(t.c)}
 const near=LallLearningCards().filter(x=>x.level===c.level&&String(x.chapter)===String(c.chapter));
 if(cs.length<count)for(const x of near){if(cs.length>=count)break;if(Lstate(x).introduced)take(x)}
@@ -120,7 +131,7 @@ function Ldetails(c){return `${Linsight(c)}${c.grammar?`<div class="grammarBox">
 function Lrender(){const fb=L$("learnFeedback");fb.className="feedback";fb.innerHTML="";L$("learnNextBtn").style.display="none";learnAnswered=false;if(learnPos>=learnQueue.length)return Lfinish();const t=learnQueue[learnPos],c=t.c;L$("learnBadge").textContent=`${t.spot?"已掌握抽查 · ":""}${Llabel(t.type)} · ${learnPos+1}/${learnQueue.length}`;L$("learnBar").style.width=`${Math.round(learnPos/learnQueue.length*100)}%`;if(t.type==="intro")Lintro(c);else if(t.type==="recognize")Lrecognize(c);else if(t.type==="reverse")Lreverse(c);else Lspell(c)}
 function Lintro(c){L$("learnBody").innerHTML=`<div class="phaseTitle">先建立第一印象：今天不要求你一上来就默写。</div><div class="learnWord">${Lesc(c.de)}</div><div class="learnZh">${Lesc(Lmeaning(c))}</div><div class="learnEn">${Lesc(LmeaningMeta(c))}</div>${Ldetails(c)}<div class="learnActions"><button class="secondary" id="learnSpeak">🔊 发音</button><button class="secondary" id="learnHard">😵 很难记</button><button class="primary" id="learnRemember">记住了，继续</button><button class="secondary" id="learnKnown">这个我已经会</button></div><div class="sourceNote">发音优先使用真人录音，没有录音时用设备的德语 TTS；词形、语法信息和例句来自你导入的词库。</div>`;L$("learnSpeak").onclick=()=>Lspeak(c.de);L$("learnRemember").onclick=()=>LintroDone(c,false,false);L$("learnHard").onclick=()=>LintroDone(c,true,false);L$("learnKnown").onclick=()=>LintroDone(c,false,true)}
 function LintroDone(c,hard,known){const s=Lstate(c);s.introduced=true;s.last=Date.now();if(known){s.known=true;s.strength=5;s.spellingPass=true;s.cycles=3;s.due=Date.now()+30*24*60*60*1000;learnQueue=learnQueue.filter((t,i)=>i<=learnPos||t.c.id!==c.id)}else if(hard){s.hard=(s.hard||0)+1;s.strength=0;s.due=Date.now()}else{s.strength=Math.max(1,s.strength||0);s.due=Date.now()}Lsave(c,s);learnPos++;Lrender()}
-function Lrecognize(c){const opts=Lshuffle([c,...Ldistractors(c)]);L$("learnBody").innerHTML=`<div class="phaseTitle">这个德语词是什么意思？</div><div class="wordRow"><div class="learnWord">${Lesc(c.de)}</div>${LspeakBtn(c.de)}</div><div class="choiceGrid">${opts.map(x=>`<button class="choice" data-id="${Lesc(x.id)}">${Lesc(Lmeaning(x))}${LhasZh(x)?`<div class="small">${Lesc(Lenglish(x))}</div>`:""}</button>`).join("")}</div>`;document.querySelectorAll("#learnBody .choice").forEach(b=>b.onclick=()=>Lchoice(c,b.dataset.id,c.id,"recognize"))}
+function Lrecognize(c){const opts=Lshuffle([c,...Ldistractors(c)]);L$("learnBody").innerHTML=`<div class="phaseTitle">这个德语词是什么意思？</div><div class="wordRow"><div class="learnWord">${Lesc(c.de)}</div>${LspeakBtn(c.de)}</div><div class="choiceGrid">${opts.map(x=>`<button class="choice" data-id="${Lesc(x.id)}">${Lesc(LoptionZh(x))}${LhasZh(x)?`<div class="small">${Lesc(LoptionEn(x))}</div>`:""}</button>`).join("")}</div>`;document.querySelectorAll("#learnBody .choice").forEach(b=>b.onclick=()=>Lchoice(c,b.dataset.id,c.id,"recognize"))}
 function Lreverse(c){const opts=Lshuffle([c,...Ldistractors(c,3,x=>x.de)]);L$("learnBody").innerHTML=`<div class="phaseTitle">看到意思，先认出正确的德语。</div><div class="learnZh">${Lesc(Lmeaning(c))}</div><div class="learnEn">${LhasZh(c)?Lesc(Lenglish(c)):""}</div><div class="choiceGrid">${opts.map(x=>`<button class="choice" data-id="${Lesc(x.id)}">${Lesc(x.de)}</button>`).join("")}</div>`;document.querySelectorAll("#learnBody .choice").forEach(b=>b.onclick=()=>Lchoice(c,b.dataset.id,c.id,"reverse"))}
 function Lchoice(c,picked,expected,type){if(learnAnswered)return;learnAnswered=true;const ok=picked===expected;document.querySelectorAll("#learnBody .choice").forEach(b=>{b.disabled=true;if(b.dataset.id===expected)b.classList.add("correct");else if(b.dataset.id===picked)b.classList.add("wrong")});Lrecord(c,ok,type);Lfeedback(c,ok);L$("learnNextBtn").style.display="";Lbring(L$("learnNextBtn"),"end")}
 function Lspell(c){L$("learnBody").innerHTML=`<div class="phaseTitle">最后才进入主动回忆。名词第一次不用强求冠词完全正确，系统会把完整形式再展示给你。</div><div class="learnZh">${Lesc(Lmeaning(c))}</div><div class="learnEn">${LhasZh(c)?Lesc(Lenglish(c)):""}</div><div class="answerBox" style="margin-top:18px"><input id="learnAnswer" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="done" placeholder="输入德语…"><button class="primary" id="learnSubmit">检查</button><button class="secondary" id="learnShow">不会 / 看答案</button></div>${LcharBar("learnAnswer")}`;const input=L$("learnAnswer");L$("learnSubmit").onclick=()=>{input.blur();LcheckSpell(c,false)};L$("learnShow").onclick=()=>{input.blur();LcheckSpell(c,true)};input.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();input.blur();LcheckSpell(c,false)}});setTimeout(()=>{try{input.focus({preventScroll:true})}catch(e){input.focus()}},80)}

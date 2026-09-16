@@ -331,6 +331,43 @@ test('today card clears due words across chapters in one session', async ({ page
   expect(total).toBeGreaterThanOrEqual(36);
 });
 
+test('a chapter-specific sense does not announce itself among the options', async ({ page }) => {
+  await open(page);
+  await page.locator('#goLearn').click();
+  await page.selectOption('#learnLevel', 'A1');
+  await page.selectOption('#learnChapter', '4');
+  await page.selectOption('#learnCount', '10');
+  await page.locator('#learnStartBtn').click();
+
+  // Kapitel 4 holds gehen twice: 走；去 and 这里：进行得顺利. The marked one used
+  // to be the only option wearing a 这里, which answers the question without
+  // knowing the word — and its twin used to be offerable as a wrong answer,
+  // which asks a question with two right answers.
+  const options: string[] = [];
+  const prompts: string[] = [];
+  for (let i = 0; i < 140; i++) {
+    const badge = (await page.locator('#learnBadge').textContent()) || '';
+    if (/本轮完成/.test(badge)) break;
+    if (await page.locator('#learnRemember').count()) { await page.locator('#learnRemember').click(); continue }
+    const choices = page.locator('#learnBody .choice');
+    if (await choices.count()) {
+      const word = await page.locator('#learnBody .learnWord').count()
+        ? (await page.locator('#learnBody .learnWord').textContent()) || '' : '';
+      const texts = await choices.allTextContents();
+      if (word) { prompts.push(word); if (word.trim() === 'gehen') expect(texts.filter((t) => /进行得顺利|走；去/.test(t))).toHaveLength(1) }
+      options.push(...texts);
+      await choices.first().click();
+    } else if (/主动拼写/.test(badge)) {
+      await page.locator('#learnShow').click();
+    }
+    await page.locator('#learnNextBtn').click();
+  }
+
+  expect(options.length).toBeGreaterThan(20);
+  expect(prompts).toContain('gehen');
+  expect(options.filter((t) => /这里|hier:/i.test(t))).toEqual([]);
+});
+
 test('a mastered word comes back for a spot check instead of vanishing', async ({ page }) => {
   await open(page);
   const cards = await deck(page);
@@ -616,7 +653,11 @@ test('the revealed answer can be played back in every mode', async ({ page }) =>
     await page.locator('#learnRemember').click();
   }
   await page.locator('#learnBody .choice').first().click();
-  await expect(page.locator('#learnFeedback .speakBtn')).toHaveCount(1);
+  // Scoped to the answer row: a card carrying an example now has a second button
+  // for the sentence, so a bare count here would pass or fail on the shuffle.
+  const learnSpeak = page.locator('#learnFeedback .answerRow .speakBtn');
+  await expect(learnSpeak).toHaveCount(1);
+  await expect(learnSpeak).not.toHaveAttribute('data-say', /[\u4e00-\u9fff]/);
 });
 
 test('remembers the level and Kapitel across reloads', async ({ page }) => {
