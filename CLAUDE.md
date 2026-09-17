@@ -56,7 +56,7 @@ npm run verify                    # tsc + vitest + build + playwright，CI 跑�
 | 文件 | 职责 |
 | --- | --- |
 | `src/learn.core.js` | 背词模式：今日任务、三层学习、拼写、SRS、发音 |
-| `src/index.html` | 单词检测模式（独立的一套进度模型） |
+| `src/index.html` | 单词检测模式（作答通过 `link-addon.js` 回写背词进度） |
 | `src/store.js` | localStorage 全部读写、迁移、备份（含自动写文件夹） |
 | `src/deck.js` | 词库解析、卡片 id、IndexedDB、`DWPatches` 补丁层 |
 | `src/insight.js` | 巧记规则表（性别/复合词/前缀，当场算） |
@@ -66,6 +66,7 @@ npm run verify                    # tsc + vitest + build + playwright，CI 跑�
 | `src/browse-addon.js` | 查词 + 章节地图 + 「学到哪了」的位置 |
 | `src/backup-addon.js` | 备份面板（文件夹 / 分享 / 下载） |
 | `src/edit-addon.js` | 应用内编辑词条（只改 zh/en/grammar/example） |
+| `src/link-addon.js` | 检测 ↔ 背词进度互通 |
 
 ---
 
@@ -229,10 +230,20 @@ npm run verify                    # tsc + vitest + build + playwright，CI 跑�
 - 地图上每章一格，显示已掌握/学习中的进度条；点一格可以「从这一章开始」
   「这之前的 N 个我都会了」「这一章我都会了」「看这一章的词」
 
-**11. 两套进度各算各的。**
-单词检测有自己的 `mastery` 模型（`index.html:114-115`），加权随机、没有排期，
-和背词模式的 `learnProgress` 互不相通——同一个词可能一边"已掌握"、另一边"没学过"。
-要么让检测结果回写 `learnProgress`，要么把它明确定位成"考前模拟"，别再叫"检测"。
+**11. 两套进度各算各的。**　✅ **已修**
+新增 `src/link-addon.js`：检测的作答**回写 `learnProgress`**，两个方向都通。
+- 两种模式不是同一种练习，但**是同一批技能**：英→德是打出德语，等于拼写层；
+  德→英是看德语说意思，等于认词层。所以按对应的 `type` 走**同一套状态转移**
+  （把 `Lrecord` 里的转移抽成了 `LapplyAnswer`——错题本当年就是因为拷了一份规则才走偏的）
+- **绝不「引入」新词**：`!s.introduced` 就不写。否则一轮 200 题全库检测会把几百个
+  从没学过的词倒进今日任务，正好和今日任务的用途相反
+- 排期被别的模式悄悄改动，用户会当成 bug，所以检测的反馈里直接写出来：
+  「已记入背词进度：下次复习两周后」/「回到复习队列」
+- 反过来也通：勾了「优先抽错词 / 生词」时，**背词里今天到期的词排在最前面**
+  （复选框的文案也改了）。不勾就还是全库平均抽
+
+`index.html` 里的 `mastery` 保留，它只用来做检测自己的加权抽取；
+已掌握的词本来就被 `mastered-addon` 挡在检测之外，所以不会在那边被打回。
 
 ## P4 · 本地优先的代价
 

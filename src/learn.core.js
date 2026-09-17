@@ -177,7 +177,14 @@ function LspellAccepted(c,input){const a=Lnorm(input),t=Lnorm(c.de);
  return a.replace(/\s/g,"")===t.replace(/\s/g,"")}
 function LcheckSpell(c,show){if(learnAnswered)return;const input=L$("learnAnswer"),v=input.value.trim();if(!show&&!v)return;learnAnswered=true;const ok=!show&&LspellAccepted(c,v);LwrongSpellResult(c,v,show,ok);Lrecord(c,ok,"spell");Lfeedback(c,ok);L$("learnSubmit").disabled=L$("learnShow").disabled=true;L$("learnNextBtn").style.display="";Lbring(L$("learnNextBtn"),"end")}
 const LAPSE_MS=10*60*1000;
-function Lrecord(c,ok,type){const s=Lstate(c);s.introduced=true;s.last=Date.now();if(ok){learnCorrect++;if(type==="spell"){s.strength=Math.min(5,(s.strength||0)+2);s.spellingPass=true;s.cycles=(s.cycles||0)+1}else{s.strength=Math.min(5,(s.strength||0)+1);if(!learnSpelling&&type==="reverse")s.cycles=(s.cycles||0)+1}s.due=Date.now()+Linterval(s)}else{s.wrong=(s.wrong||0)+1;s.lapses=(s.lapses||0)+1;s.strength=Math.max(0,(s.strength||0)-1);s.cycles=Math.max(0,(s.cycles||0)-1);if(type==="spell")s.spellingPass=false;s.known=false;s.due=Date.now()+LAPSE_MS}Lsave(c,s)}
+// What one answer does to a word's schedule, kept apart from where the answer
+// came from: 单词检测 asks the same words with the same two skills, and a second
+// copy of these transitions is how the wrong-book drifted out of step before.
+function LapplyAnswer(s,ok,type){s.introduced=true;s.last=Date.now();
+ if(ok){if(type==="spell"){s.strength=Math.min(5,(s.strength||0)+2);s.spellingPass=true;s.cycles=(s.cycles||0)+1}else{s.strength=Math.min(5,(s.strength||0)+1);if(!learnSpelling&&type==="reverse")s.cycles=(s.cycles||0)+1}s.due=Date.now()+Linterval(s)}
+ else{s.wrong=(s.wrong||0)+1;s.lapses=(s.lapses||0)+1;s.strength=Math.max(0,(s.strength||0)-1);s.cycles=Math.max(0,(s.cycles||0)-1);if(type==="spell")s.spellingPass=false;s.known=false;s.due=Date.now()+LAPSE_MS}
+ return s}
+function Lrecord(c,ok,type){const s=Lstate(c);if(ok)learnCorrect++;LapplyAnswer(s,ok,type);Lsave(c,s)}
 function Lfeedback(c,ok){const s=Lstate(c),fb=L$("learnFeedback");fb.className="feedback show "+(ok?"ok":"no");fb.innerHTML=`<b>${ok?"✓ 对了":"✗ 这次先记住它"}</b><div class="answerRow"><div class="deAnswer">${Lesc(c.de)}</div>${LspeakBtn(c.de)}</div><div>${Lesc(Lmeaning(c))} <span class="meta">· ${Lesc(Lenglish(c))}</span></div>${Ldetails(c)}<div class="meta" style="margin-top:8px">当前掌握度：${Math.min(5,s.strength||0)}/5 · 记忆轮次 ${Math.min(3,s.cycles||0)}/3${s.spellingPass?" · 已通过拼写":""}</div>`}
 function Lfinish(){L$("learnBar").style.width="100%";const total=learnQueue.filter(x=>x.type!=="intro").length,pct=total?Math.round(learnCorrect/total*100):100;L$("learnBadge").textContent=learnToday?"今日任务 · 本轮完成":"本轮完成";L$("learnBody").innerHTML=`<div class="sessionDone"><div class="big">🎉</div><h2>${learnToday?"今日任务":Lesc(LscopeLabel())} · 本轮完成</h2><p class="sub">${learnRoundNew?`新认识 ${learnRoundNew} 个词。`:"完成了一轮到期复习。"} 练习正确率 ${pct}% 。一个词需要经过 3 个记忆轮次（约 1 天、3 天的间隔复习）才计入“已掌握”。${learnSpelling?"":"本轮关闭了拼写，所以这些词不会计入“已掌握”。"}</p><div class="learnActions">${learnToday?`<button class="primary" id="learnAgainToday">继续今日任务</button>`:""}<button class="${learnToday?"secondary":"primary"}" id="learnAgainNew">继续学新词</button><button class="secondary" id="learnAgainReview">看看到期词</button></div></div>`;L$("learnAgainNew").onclick=()=>Lstart(false);L$("learnAgainReview").onclick=()=>Lstart(true);const again=L$("learnAgainToday");if(again)again.onclick=()=>LstartToday();L$("learnFeedback").className="feedback";L$("learnNextBtn").style.display="none";Lstats();LhomeStats()}
 // Only the language was set, never the voice, so the browser fell back to its
@@ -320,4 +327,4 @@ function Lopener(){let q;try{q=new URLSearchParams(location.search)}catch(e){ret
   if(q.get("mastered")==="1"){Lshow("learn");if(typeof LopenMastered==="function")LopenMastered();return}
   if(q.get("wrong")==="1"){Lshow("learn");if(typeof LopenWrongBook==="function")LopenWrongBook();return}
   if(view==="learn"||view==="quiz")Lshow(view)}
-function Lboot(){LbuildShell();LinitWrongBookUI();LinitMasteredUI();LinitDrillUI();LinitBrowseUI();LinitBackupUI();LinitEditUI();Lready()}
+function Lboot(){LbuildShell();LinitWrongBookUI();LinitMasteredUI();LinitDrillUI();LinitBrowseUI();LinitBackupUI();LinitEditUI();LinitQuizLink();Lready()}

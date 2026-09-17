@@ -1735,3 +1735,164 @@ test('corrections travel in the backup, and come back on restore', async ({ page
   await page.locator('#browseInput').fill('Blume');
   await expect(page.locator('.browseItem').first()).toContainText('花（补过的）');
 });
+
+// 单词检测 and 背词 used to keep separate books on the same words: twenty minutes
+// of testing taught the schedule nothing, and the same word could be 已掌握 on
+// one side and 没学过 on the other.
+const fullDeck = async (page: Page): Promise<Array<{ id: string; level: string; chapter: string; de: string; en: string }>> =>
+  page.evaluate(() => (window as any).__deck.cards.map((c: any) =>
+    ({ id: c.id, level: c.level, chapter: String(c.chapter), de: c.de, en: c.en || '' })));
+
+const answerQuiz = async (page: Page, cards: Array<{ de: string; en: string }>, right: boolean) => {
+  const prompt = (await page.locator('#prompt').textContent())!.trim();
+  const card = cards.find((c) => c.en.replace(/^[_\-–—\s]+/, '').trim() === prompt);
+  if (!card) throw new Error(`no card for prompt ${prompt}`);
+  await page.locator('#answer').fill(right ? card.de : 'zzz');
+  await page.locator('#submitBtn').click();
+  return card;
+};
+
+// Writes are batched, so the store is flushed before the file is read — this is
+// asserting what was saved, not what a 1500ms timer had got round to.
+const stateOf = (page: Page, id: string) =>
+  page.evaluate(([key, id]) => {
+    (window as any).DWStore.flush();
+    return JSON.parse(localStorage.getItem(key as string) || '{}')[id as string];
+  }, [LEARN_KEY, id] as const);
+
+test('a word tested in 单词检测 counts towards the schedule that asks about it', async ({ page }) => {
+  await open(page);
+  const cards = await fullDeck(page);
+  const pick = cards.filter((c) => c.level === 'A1' && c.chapter === '2');
+  await page.evaluate(([learnKey, schemaKey, ids]) => {
+    const learn: Record<string, unknown> = {};
+    for (const id of ids as string[]) {
+      learn[id] = { introduced: true, strength: 2, wrong: 0, hard: 0, last: 1, due: 1, spellingPass: false, cycles: 1, known: false };
+    }
+    localStorage.setItem(learnKey as string, JSON.stringify(learn));
+    localStorage.setItem(schemaKey as string, '2');
+  }, [LEARN_KEY, SCHEMA_KEY, pick.map((c) => c.id)] as const);
+  await page.reload();
+  await ready(page);
+
+  await page.locator('#goQuiz').click();
+  await page.selectOption('#level', 'A1');
+  await page.selectOption('#chapter', '2');
+  await page.locator('#startBtn').click();
+  const card = await answerQuiz(page, pick, true);
+
+  // Typing the German is the spelling layer's question, so it counts as one —
+  // and the learner is told, because a schedule that moves silently is a bug.
+  await expect(page.locator('#feedback')).toContainText('已记入背词进度');
+  const after = await stateOf(page, pick.find((c) => c.de === card.de)!.id);
+  expect(after.spellingPass).toBe(true);
+  expect(after.cycles).toBe(2);
+  expect(after.due).toBeGreaterThan(Date.now() + 60_000);
+});
+
+test('missing a word in 单词检测 knocks it back down the schedule', async ({ page }) => {
+  await open(page);
+  const cards = await fullDeck(page);
+  const pick = cards.filter((c) => c.level === 'A1' && c.chapter === '2');
+  // One cycle short of mastered, spelling already passed. Actually mastered
+  // words never reach 检测 at all — they are filtered out of it — so this is the
+  // furthest along a word can be and still be asked here.
+  await page.evaluate(([learnKey, schemaKey, ids]) => {
+    const learn: Record<string, unknown> = {};
+    for (const id of ids as string[]) {
+      learn[id] = { introduced: true, strength: 5, wrong: 0, hard: 0, last: 1, due: 1, spellingPass: true, cycles: 2, known: false };
+    }
+    localStorage.setItem(learnKey as string, JSON.stringify(learn));
+    localStorage.setItem(schemaKey as string, '2');
+  }, [LEARN_KEY, SCHEMA_KEY, pick.map((c) => c.id)] as const);
+  await page.reload();
+  await ready(page);
+
+  await page.locator('#goQuiz').click();
+  await page.selectOption('#level', 'A1');
+  await page.selectOption('#chapter', '2');
+  await page.locator('#startBtn').click();
+  const card = await answerQuiz(page, pick, false);
+  await expect(page.locator('#feedback')).toContainText('回到复习队列');
+
+  const after = await stateOf(page, pick.find((c) => c.de === card.de)!.id);
+  expect(after.cycles).toBe(1);
+  expect(after.spellingPass).toBe(false);
+  expect(after.known).toBe(false);
+  expect(after.due).toBeLessThan(Date.now() + 60 * 60 * 1000);
+});
+
+test('a mastered word is never asked in 单词检测, so it cannot be knocked back there', async ({ page }) => {
+  await open(page);
+  const cards = await fullDeck(page);
+  const pick = cards.filter((c) => c.level === 'A1' && c.chapter === '2');
+  await page.evaluate(([learnKey, schemaKey, ids]) => {
+    const learn: Record<string, unknown> = {};
+    for (const id of ids as string[]) {
+      learn[id] = { introduced: true, strength: 5, wrong: 0, hard: 0, last: 1, due: 1, spellingPass: true, cycles: 3, known: true };
+    }
+    localStorage.setItem(learnKey as string, JSON.stringify(learn));
+    localStorage.setItem(schemaKey as string, '2');
+  }, [LEARN_KEY, SCHEMA_KEY, pick.map((c) => c.id)] as const);
+  await page.reload();
+  await ready(page);
+  await expect(page.locator('#homeMastered')).toHaveText('6');
+
+  await page.locator('#goQuiz').click();
+  await page.selectOption('#level', 'A1');
+  await page.selectOption('#chapter', '2');
+  page.once('dialog', (d) => d.accept());
+  await page.locator('#startBtn').click();
+  // The whole Kapitel is mastered, so there is nothing left to ask.
+  await expect(page.locator('#prompt')).toContainText('选择级别');
+});
+
+test('单词检测 never introduces a word the learner has not been taught', async ({ page }) => {
+  await open(page);
+  const cards = await fullDeck(page);
+  const pick = cards.filter((c) => c.level === 'A1' && c.chapter === '2');
+  await page.locator('#goQuiz').click();
+  await page.selectOption('#level', 'A1');
+  await page.selectOption('#chapter', '2');
+  await page.locator('#startBtn').click();
+  const card = await answerQuiz(page, pick, true);
+
+  // A 200-question round over the whole deck would otherwise pour hundreds of
+  // untaught words into 今日任务 — the opposite of what it is for.
+  await expect(page.locator('#feedback')).not.toContainText('已记入背词进度');
+  expect(await stateOf(page, pick.find((c) => c.de === card.de)!.id)).toBeUndefined();
+});
+
+test('a round of 单词检测 starts with what the schedule wants today', async ({ page }) => {
+  await open(page);
+  const cards = await fullDeck(page);
+  const a1 = cards.filter((c) => c.level === 'A1' && c.chapter === '1');
+  const due = a1.slice(-3);
+  await page.evaluate(([learnKey, schemaKey, ids]) => {
+    const learn: Record<string, unknown> = {};
+    for (const id of ids as string[]) {
+      learn[id] = { introduced: true, strength: 2, wrong: 0, hard: 0, last: 1, due: 1, spellingPass: false, cycles: 1, known: false };
+    }
+    localStorage.setItem(learnKey as string, JSON.stringify(learn));
+    localStorage.setItem(schemaKey as string, '2');
+  }, [LEARN_KEY, SCHEMA_KEY, due.map((c) => c.id)] as const);
+  await page.reload();
+  await ready(page);
+
+  await page.locator('#goQuiz').click();
+  await page.selectOption('#level', 'A1');
+  await page.selectOption('#chapter', '1');
+  await page.selectOption('#count', '10');
+  await page.locator('#startBtn').click();
+
+  // Three words are due; they come first, whatever the weighting did with the
+  // other twenty-seven.
+  const seen: string[] = [];
+  for (let i = 0; i < 3; i++) {
+    seen.push((await page.locator('#prompt').textContent())!.trim());
+    await page.locator('#showBtn').click();
+    await page.locator('#nextBtn').click();
+  }
+  const dueEn = due.map((c) => c.en.replace(/^[_\-–—\s]+/, '').trim());
+  expect(seen.sort()).toEqual(dueEn.sort());
+});
