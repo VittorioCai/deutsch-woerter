@@ -19,12 +19,12 @@
 
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshots/01-start.png" alt="开始界面"><br><sub><b>打开就能用。</b>一键载入内置的 324 词示例词库，或者直接拖入自己的 CSV。</sub></td>
-<td width="50%"><img src="docs/screenshots/02-home.png" alt="首页"><br><sub><b>每天只需要点一个按钮。</b>跨章节的所有到期复习，加上几个新词。</sub></td>
+<td width="50%"><img src="docs/screenshots/r2-01-start.png" alt="开始界面"><br><sub><b>打开就能用。</b>一键载入内置的 324 词示例词库，或者直接拖入自己的 CSV。</sub></td>
+<td width="50%"><img src="docs/screenshots/r2-02-home.png" alt="首页"><br><sub><b>每天只需要点一个按钮。</b>跨章节的所有到期复习，加上几个新词。</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="docs/screenshots/08-compound.png" alt="巧记"><br><sub><b>告诉你为什么。</b>性别看词尾、复合词拆开看、复数自动推 —— 当场算出来，对任何词库都生效。</sub></td>
-<td width="50%"><img src="docs/screenshots/05-drill.png" alt="专项训练"><br><sub><b>练拼写查不出来的东西：</b>der/die/das、复数形式、动词变位、haben/sein、介词 + 格、例句填空、听写。</sub></td>
+<td width="50%"><img src="docs/screenshots/r2-08-compound.png" alt="巧记"><br><sub><b>告诉你为什么。</b>性别看词尾、复合词拆开看、复数自动推 —— 当场算出来，对任何词库都生效。</sub></td>
+<td width="50%"><img src="docs/screenshots/r2-05-drill.png" alt="专项训练"><br><sub><b>练拼写查不出来的东西：</b>der/die/das、复数形式、动词变位、haben/sein、介词 + 格、例句填空、听写。</sub></td>
 </tr>
 </table>
 

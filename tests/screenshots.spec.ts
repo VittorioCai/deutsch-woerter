@@ -9,6 +9,10 @@ import { fileURLToPath } from 'node:url';
 // here rather than shooting by hand means the README cannot quietly drift years
 // out of date with the app.
 const OUT = fileURLToPath(new URL('../docs/screenshots', import.meta.url));
+// GitHub caches README images by URL for a long time, so a regenerated file under
+// the same name keeps showing the old picture. Bump REV when regenerating and
+// replace the old prefix in both READMEs.
+const REV = 'r2';
 test.use({ viewport: { width: 400, height: 860 }, deviceScaleFactor: 2 });
 
 test('capture the README screenshots', async ({ page }) => {
@@ -25,7 +29,7 @@ test('capture the README screenshots', async ({ page }) => {
 
   await page.goto('/');
   await page.waitForSelector('#deckDemoBtn');
-  await page.screenshot({ path: `${OUT}/01-start.png`, clip: { x: 0, y: 0, width: 400, height: 620 } });
+  await page.screenshot({ path: `${OUT}/${REV}-01-start.png`, clip: { x: 0, y: 0, width: 400, height: 620 } });
 
   await page.locator('#deckDemoBtn').click();
   await page.waitForSelector('#homeView');
@@ -51,14 +55,14 @@ test('capture the README screenshots', async ({ page }) => {
   await page.reload();
   await page.waitForSelector('#goToday:not([disabled])');
   await page.evaluate(() => window.scrollTo(0, 0));
-  await page.screenshot({ path: `${OUT}/02-home.png` });
+  await page.screenshot({ path: `${OUT}/${REV}-02-home.png` });
 
   await page.locator('#goLearn').click();
   await page.selectOption('#learnLevel', 'A1');
   await page.selectOption('#learnChapter', '5');
   await page.locator('#learnStartBtn').click();
   await page.waitForSelector('#learnBody .learnWord');
-  await page.locator('#learnCard').screenshot({ path: `${OUT}/03-learn.png` });
+  await page.locator('#learnCard').screenshot({ path: `${OUT}/${REV}-03-learn.png` });
 
   // A card whose word the rules have something to say about.
   await page.locator('#modeBack').click();
@@ -67,18 +71,18 @@ test('capture the README screenshots', async ({ page }) => {
   await page.selectOption('#learnChapter', '6');
   await page.locator('#learnStartBtn').click();
   await page.waitForSelector('.insightBox');
-  await page.locator('#learnCard').screenshot({ path: `${OUT}/07-insight.png` });
+  await page.locator('#learnCard').screenshot({ path: `${OUT}/${REV}-07-insight.png` });
   for (let i = 0; i < 3 && !(await page.locator('.insightBox').innerText()).includes('拆开看'); i++) {
     await page.locator('#learnRemember').click();
     await page.waitForSelector('.insightBox');
   }
-  await page.locator('#learnCard').screenshot({ path: `${OUT}/08-compound.png` });
+  await page.locator('#learnCard').screenshot({ path: `${OUT}/${REV}-08-compound.png` });
 
   for (let i = 0; i < 6 && !(await page.locator('#learnBody .choice').count()); i++) {
     await page.locator('#learnRemember').click();
   }
   await page.waitForSelector('#learnBody .choice');
-  await page.locator('#learnCard').screenshot({ path: `${OUT}/04-choice.png` });
+  await page.locator('#learnCard').screenshot({ path: `${OUT}/${REV}-04-choice.png` });
 
   await page.goto('/');
   await page.waitForSelector('#homeView');
@@ -87,9 +91,9 @@ test('capture the README screenshots', async ({ page }) => {
   await page.waitForSelector('.genderGrid button');
   await page.locator('.genderGrid button').first().click();
   await page.waitForSelector('#drillNext');
-  await page.locator('.drillSheet').screenshot({ path: `${OUT}/05-drill.png` });
+  await page.locator('.drillSheet').screenshot({ path: `${OUT}/${REV}-05-drill.png` });
 
   await page.goto('/?mastered=1');
   await page.waitForSelector('#masteredOverlay .masterItem');
-  await page.locator('.masterSheet').screenshot({ path: `${OUT}/06-mastered.png` });
+  await page.locator('.masterSheet').screenshot({ path: `${OUT}/${REV}-06-mastered.png` });
 });
