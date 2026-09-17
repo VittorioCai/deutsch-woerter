@@ -1074,3 +1074,33 @@ describe('why a verb changes the way it does', () => {
     });
   });
 });
+
+// The deck the app ships is every first visitor's first impression. Four of the
+// seven drills were empty on it; this pins that they never go empty again.
+describe('the starter deck shows every drill working', () => {
+  const documentStub = { addEventListener: () => {}, getElementById: () => null };
+  const DWStoreStub = { KEYS: { LEARN: 'l' }, read: () => ({}), onMigrated: () => {}, prefs: () => ({}), queue: () => {} };
+  const raw = JSON.parse(readFileSync(new URL('../src/starter-deck.json', import.meta.url), 'utf8'));
+  const cards: Array<Record<string, string>> = (raw.cards as Array<Record<string, string>>).map((c, i) => ({ ...c, id: `s${i}`, chapter: String(c.chapter) }));
+  const src = ['insight.js', 'learn.core.js', 'drills-addon.js']
+    .map((f) => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8')).join('\n');
+  const api = new Function('DWStore', 'document', 'window', 'CARDS',
+    `${src}\nZH=Object.fromEntries(CARDS.filter(c=>c.zh).map(c=>[c.id,c.zh]));\nreturn { LdrillPoolFor, DWInsight };`)(
+    DWStoreStub, documentStub, {}, cards) as { LdrillPoolFor(kind: string): unknown[]; DWInsight: any };
+
+  it.each(['gender', 'plural', 'conj', 'aux', 'rektion', 'cloze', 'dictation'])('has at least eight %s questions', (kind) => {
+    expect(api.LdrillPoolFor(kind).length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('carries examples in the format the app itself defines, with the Chinese half', () => {
+    const withExample = cards.filter((c) => c.example);
+    expect(withExample.length).toBeGreaterThanOrEqual(60);
+    for (const c of withExample) expect(c.example, c.de).toMatch(/^[^（）]+（[^（）]+）$/);
+  });
+
+  it('lets the insight panel explain sein for the verbs that take it', () => {
+    let sein = 0;
+    for (const c of cards) for (const r of api.DWInsight.Lanalyse(c, cards)) if (r.kind === 'aux') sein++;
+    expect(sein).toBeGreaterThanOrEqual(5);
+  });
+});

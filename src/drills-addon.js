@@ -293,7 +293,19 @@ const LDRILLS = [
   { kind: "cloze", id: "tabCloze", tab: "例句填空" },
   { kind: "dictation", id: "tabDictation", tab: "听写" },
 ];
+// An empty drill says what the deck is missing and where to put it, instead of
+// describing a feature it cannot demonstrate on this deck.
+function LdrillEmpty(kind) {
+  const fix = (col) => `点任意词条的 ✏️ 改，在${col}补上；或者导入带这一栏的词库。`;
+  if (kind === "conj" || kind === "aux") return `<b>这个词库的动词没写变位。</b> 词形栏写成 <code>er nimmt, hat genommen</code> 就能出题。${fix("词形栏")}`;
+  if (kind === "rektion") return `<b>这个词库的释义里没有支配格标记。</b> 释义写成 <code>等待（auf +A）</code> 或 <code>帮助（+D）</code> 就能出题。${fix("中文释义")}`;
+  if (kind === "cloze") return `<b>这个词库没有能定位到词的例句。</b> 例句写成 <code>Deutscher Satz.（中文）</code>，而且词要出现在句子里。${fix("例句")}`;
+  if (kind === "plural") return `<b>这个词库的名词没写复数。</b> 词形栏写 <code>Plural: die Häuser</code> 或 <code>"er</code> 就能出题。${fix("词形栏")}`;
+  if (kind === "gender") return `<b>这个词库里没有带冠词的名词。</b> 德语名词写成 <code>das Haus</code>，性别题才有东西可问。`;
+  return `<b>这个词库里没有能单独朗读的词。</b>`;
+}
 function LdrillBlurb(kind, n) {
+  if (!n) return LdrillEmpty(kind);
   if (kind === "gender") return `<b>性别专项 · 可练 ${n} 个名词。</b> 拼写检查默认不强制冠词，所以性别几乎没被单独考过。已掌握的词不会出现。`;
   if (kind === "plural") return `<b>复数专项 · 可练 ${n} 个名词。</b> 复数形式由词库的词形记号推导（<code>"</code> 表示变音），无法确定的词不会出题。`;
   if (kind === "aux") return `<b>haben / sein · 可练 ${n} 个动词。</b> 完成时该用哪个助动词，词形栏里早就写着（<code>ist gegangen</code>），但从来没考过。大体上位移和状态变化用 sein，其余用 haben —— 例外只能靠练出来。`;
