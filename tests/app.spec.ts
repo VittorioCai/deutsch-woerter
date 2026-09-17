@@ -1948,3 +1948,51 @@ test('the other sense of a word is shown, not only kept out of the wrong answers
   }
   throw new Error('gehen never came up');
 });
+
+// The position and the Kapitel picker were two values that never met: the home
+// screen said A1 Kapitel 5 while the learn page opened on Kapitel 1.
+const levelSection = (page: Page, level: string) =>
+  page.locator('.mapLevel', { has: page.locator('h3', { hasText: level }) });
+
+test('choosing a Kapitel on the map moves the learn page there too', async ({ page }) => {
+  await open(page);
+  await page.locator('#posEdit').click();
+  await levelSection(page, 'A2').locator('.mapTile').first().click();
+  await expect(page.locator('.mapActions')).toContainText('A2 Kapitel 1');
+  await page.locator('#mapStartHere').click();
+  await page.locator('#browseClose').click();
+  await expect(page.locator('#posBar')).toContainText('学到 A2 Kapitel 1');
+
+  await page.locator('#goLearn').click();
+  await expect(page.locator('#learnLevel')).toHaveValue('A2');
+  await expect(page.locator('#learnChapter')).toHaveValue('1');
+  await expect(page.locator('#learnBody')).toContainText('A2 Kapitel 1');
+});
+
+test('with a position but no hand-picked Kapitel, the learn page opens at the position', async ({ page }) => {
+  await open(page);
+  await page.evaluate(([prefsKey]) => {
+    localStorage.setItem(prefsKey as string, JSON.stringify({ posLevel: 'A2', posChapter: '5' }));
+  }, [PREFS_KEY] as const);
+  await page.reload();
+  await ready(page);
+  await page.locator('#goLearn').click();
+  await expect(page.locator('#learnLevel')).toHaveValue('A2');
+  await expect(page.locator('#learnChapter')).toHaveValue('5');
+});
+
+test('browsing another Kapitel does not move the position, and the home screen says so', async ({ page }) => {
+  await open(page);
+  await page.evaluate(([prefsKey]) => {
+    localStorage.setItem(prefsKey as string, JSON.stringify({ posLevel: 'A1', posChapter: '3' }));
+  }, [PREFS_KEY] as const);
+  await page.reload();
+  await ready(page);
+  await page.locator('#goLearn').click();
+  await page.selectOption('#learnLevel', 'A1');
+  await page.selectOption('#learnChapter', '1');
+  await page.locator('#modeBack').click();
+  // Looking at a chapter is not having reached it.
+  await expect(page.locator('#posBar')).toContainText('学到 A1 Kapitel 3');
+  await expect(page.locator('#posBar')).toContainText('上次在看 A1 Kapitel 1');
+});

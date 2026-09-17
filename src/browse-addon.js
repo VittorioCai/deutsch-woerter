@@ -84,7 +84,11 @@ function LrenderPosBar() {
   if (!g) { el.innerHTML = ""; return; }
   if (LposIndex() >= 0) {
     const left = g.cards.filter(Lunlearned).length;
-    el.innerHTML = `<div class="posNow">📍 学到 <b>${Lesc(g.level)} Kapitel ${Lesc(g.chapter)}</b> · 本章还有 <b>${left}</b> 个新词没学（共 ${g.cards.length}）</div><button class="secondary" id="posEdit">换一章</button>`;
+    // Browsing a different Kapitel on the learn page is allowed and does not
+    // move the position, so the bar says so instead of letting the two disagree
+    // in silence.
+    const sc = Lscope(), elsewhere = sc.level !== g.level || String(sc.chapter) !== g.chapter;
+    el.innerHTML = `<div class="posNow">📍 学到 <b>${Lesc(g.level)} Kapitel ${Lesc(g.chapter)}</b> · 本章还有 <b>${left}</b> 个新词没学（共 ${g.cards.length}）${elsewhere ? `<br><span class="small">学新词页上次在看 ${Lesc(sc.level)} Kapitel ${Lesc(String(sc.chapter))}</span>` : ""}</div><button class="secondary" id="posEdit">换一章</button>`;
   } else {
     el.innerHTML = `<div class="posAsk"><b>你已经学到哪一章了？</b><span class="small">不说的话，今日任务会从词库第一章开始给新词。</span></div><button class="primary" id="posEdit">告诉它</button>`;
   }

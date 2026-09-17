@@ -60,11 +60,11 @@ function Lcoverage(cards){const cov=L$("learnCoverage");if(!cov)return;const by=
 const LcmpLevel=(a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true,sensitivity:"base"});
 function LlevelChoices(){return `<option value="ALL">全部级别</option>`+[...new Set(LallLearningCards().map(c=>c.level))].sort(LcmpLevel).map(l=>`<option value="${Lesc(l)}">${Lesc(l)}</option>`).join("")}
 function LsyncLevels(){const lv=L$("learnLevel");if(!lv)return;const prev=lv.value,ls=[...new Set(LallLearningCards().map(c=>c.level))].sort(LcmpLevel);lv.innerHTML=ls.map(l=>`<option value="${Lesc(l)}">${Lesc(l)}</option>`).join("");if(ls.includes(prev))lv.value=prev}
-function LrestoreScope(){LsyncLevels();const p=DWStore.prefs(),lv=L$("learnLevel");
- if(p.level&&lv&&[...lv.options].some(o=>o.value===p.level))lv.value=p.level;
- LsyncChapters();
- const ch=L$("learnChapter");
- if(p.chapter&&ch&&[...ch.options].some(o=>o.value===String(p.chapter))){ch.value=String(p.chapter);Lstats();Llanding()}}
+function LrestoreScope(){const p=DWStore.prefs();
+ if(p.level&&p.chapter&&LapplyScope(String(p.level),String(p.chapter)))return;
+ // Never picked a Kapitel by hand: open where the plan is, not on the first one.
+ if(p.posLevel&&p.posChapter&&LapplyScope(String(p.posLevel),String(p.posChapter)))return;
+ LsyncLevels();LsyncChapters()}
 function LsyncChapters(){if(!L$("learnLevel")||!L$("learnChapter"))return;const level=L$("learnLevel").value,prev=L$("learnChapter").value,chs=[...new Set(LallLearningCards().filter(c=>c.level===level).map(c=>String(c.chapter)))].sort(LcmpLevel);L$("learnChapter").innerHTML=chs.map(ch=>`<option value="${ch}">Kapitel ${ch}</option>`).join("");if(chs.includes(prev))L$("learnChapter").value=prev;Lstats();Llanding()}
 const LTODAY_REVIEW_CAP=40;
 let learnSpelling=DWStore.prefs().spelling!==false;
@@ -104,7 +104,15 @@ function LposGroup(){const gs=LchapGroups();if(!gs.length)return null;
  const at=LposIndex(),from=at<0?0:at;
  for(let i=from;i<gs.length;i++)if(gs[i].cards.some(Lunlearned))return gs[i];
  return gs[from]||gs[0]}
-function LsetPos(level,chapter){DWStore.prefs({posLevel:String(level),posChapter:String(chapter)});LupdateToday();if(typeof LrenderPosBar==="function")LrenderPosBar()}
+// The position and the Kapitel picker used to be two values that never met: the
+// home screen said A1 Kapitel 5 while the learn page opened on Kapitel 1.
+// Setting the position now moves the picker with it. Changing the picker does
+// not move the position — looking at a chapter is not having reached it.
+function LsetPos(level,chapter){DWStore.prefs({posLevel:String(level),posChapter:String(chapter)});LapplyScope(String(level),String(chapter));LupdateToday();if(typeof LrenderPosBar==="function")LrenderPosBar()}
+function LapplyScope(level,chapter){const lv=L$("learnLevel"),ch=L$("learnChapter");if(!lv||!ch)return false;
+ LsyncLevels();if(![...lv.options].some(o=>o.value===level))return false;lv.value=level;
+ LsyncChapters();if(![...ch.options].some(o=>o.value===chapter))return false;ch.value=chapter;
+ DWStore.prefs({level,chapter});Lstats();Llanding();return true}
 function LfreshCards(n){const gs=LchapGroups(),at=LposIndex(),start=at<0?0:at,out=[];
  const sweep=(from,to)=>{for(let i=from;i<to&&out.length<n;i++)for(const c of gs[i].cards){if(out.length>=n)break;if(Lunlearned(c))out.push(c)}};
  sweep(start,gs.length);
