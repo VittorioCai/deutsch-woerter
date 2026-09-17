@@ -56,7 +56,7 @@ npm run verify                    # tsc + vitest + build + playwright，CI 跑�
 - **每一页只有一件主事，它必须在手机首屏。** 首页是今日任务，学新词页是学习卡，检测页是题目。
   有端到端测试守着：390 宽下学习卡的顶边必须落在首屏内。
 - **图标用 `Licon()` 画（Feather 线条图标，内联 SVG），emoji 只留给庆祝（🎉）。** 子页面顶部是一条细导航
-  （`#topBar`：返回 + 页名，`Lshow()` 切换），首页才显示应用名。学习卡只有一个大按钮，「这个我已经会 · 改词条」是文字链接。
+  （`#topBar`：返回 + 页名，`Lshow()` 切换），首页才显示应用名。学习卡只有一个大按钮，「早就会了，跳过 · 词条有错」是文字链接。
 - **设一次就不动的东西进折叠的「⚙️ 设置」**（`<details id="learnSettings">` / `#quizSettings`），
   在卡片下方，不是弹层——弹层会盖住你正在调语音的那张卡。
   测试里碰设置项之前先 `openSettings(page)` / `openQuizSettings(page)`。

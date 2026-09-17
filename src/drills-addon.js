@@ -296,7 +296,7 @@ const LDRILLS = [
 // An empty drill says what the deck is missing and where to put it, instead of
 // describing a feature it cannot demonstrate on this deck.
 function LdrillEmpty(kind) {
-  const fix = (col) => `点任意词条的「改词条」，在${col}补上；或者导入带这一栏的词库。`;
+  const fix = (col) => `点学习卡上的「词条有错」，在${col}补上；或者导入带这一栏的词库。`;
   if (kind === "conj" || kind === "aux") return `<b>这个词库的动词没写变位。</b> 词形栏写成 <code>er nimmt, hat genommen</code> 就能出题。${fix("词形栏")}`;
   if (kind === "rektion") return `<b>这个词库的释义里没有支配格标记。</b> 释义写成 <code>等待（auf +A）</code> 或 <code>帮助（+D）</code> 就能出题。${fix("中文释义")}`;
   if (kind === "cloze") return `<b>这个词库没有能定位到词的例句。</b> 例句写成 <code>Deutscher Satz.（中文）</code>，而且词要出现在句子里。${fix("例句")}`;

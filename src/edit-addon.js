@@ -35,7 +35,7 @@ function LbuildEditUI() {
   ov.addEventListener("click", (e) => { if (e.target === ov) LcloseEdit() });
 }
 function LcloseEdit() { L$("editOverlay").classList.add("hidden") }
-function LeditBtn(id) { return `<button type="button" class="linkBtn editBtn" data-edit="${Lesc(id)}">改词条</button>` }
+function LeditBtn(id) { return `<button type="button" class="linkBtn editBtn" data-edit="${Lesc(id)}">词条有错</button>` }
 document.addEventListener("click", (e) => {
   const b = e.target.closest && e.target.closest("[data-edit]");
   if (!b) return;

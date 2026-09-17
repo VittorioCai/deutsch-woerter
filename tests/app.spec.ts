@@ -2062,7 +2062,7 @@ test('the introduction card has one button, and the rest is small print', async 
   await expect(page.locator('#learnHard')).toHaveCount(0);
   await expect(page.locator('#learnBody .phaseTitle')).toHaveCount(0);
   await expect(page.locator('#learnBody .sourceNote')).toHaveCount(0);
-  // 这个我已经会 and 改词条 are lines of text: smaller than the button, still working
+  // 早就会了，跳过 and 词条有错 are lines of text: smaller than the button, still working
   const link = page.locator('#learnKnown');
   await expect(link).toHaveClass(/linkBtn/);
   const [linkPx, buttonPx] = await Promise.all([
