@@ -52,6 +52,10 @@ const openSettings = async (page: Page) => {
   await page.locator('#learnSettings').evaluate((d) => { (d as HTMLDetailsElement).open = true; });
 };
 
+const openQuizSettings = async (page: Page) => {
+  await page.locator('#quizSettings').evaluate((d) => { (d as HTMLDetailsElement).open = true; });
+};
+
 const open = async (page: Page) => {
   await page.goto(APP);
   if (await page.locator('#deckGate').isVisible()) {
@@ -1094,7 +1098,8 @@ test('the first visit asks for a word list and keeps it afterwards', async ({ pa
   });
   await ready(page);
   await expect(page.locator('#deckInfo')).toContainText('2 个词条');
-  await expect(page.locator('#bankInfo')).toContainText('A1 2');
+  // The quiz's idle line counts the same two words.
+  await expect(page.locator('#prompt')).toContainText('2 个词');
 
   // and it is still there on the next visit, offline included
   await page.reload();
@@ -1861,7 +1866,7 @@ test('a mastered word is never asked in 单词检测, so it cannot be knocked ba
   page.once('dialog', (d) => d.accept());
   await page.locator('#startBtn').click();
   // The whole Kapitel is mastered, so there is nothing left to ask.
-  await expect(page.locator('#prompt')).toContainText('选择级别');
+  await expect(page.locator('#prompt')).toContainText('当前筛选 0 个词');
 });
 
 test('单词检测 never introduces a word the learner has not been taught', async ({ page }) => {
@@ -1899,6 +1904,7 @@ test('a round of 单词检测 starts with what the schedule wants today', async 
   await page.locator('#goQuiz').click();
   await page.selectOption('#level', 'A1');
   await page.selectOption('#chapter', '1');
+  await openQuizSettings(page);
   await page.selectOption('#count', '10');
   await page.locator('#startBtn').click();
 
