@@ -2128,3 +2128,25 @@ test('a wrong answer is asked again before the round ends, not ten minutes later
   }
   expect(learnt).toBe(5);
 });
+
+// The chrome is drawn, not typed. Six emoji in a row rendered as six fonts'
+// idea of a picture, and every page carried the app's name in 38px above a
+// grey back button before its own content began.
+test('sub-pages carry a slim top bar, and the entrances carry icons, not emoji', async ({ page }) => {
+  await open(page);
+  await expect(page.locator('.wrap > h1')).toBeVisible();
+  await expect(page.locator('#homeEntries .entry .entryIcon svg')).toHaveCount(6);
+  for (const t of await page.locator('#homeEntries .entry').allInnerTexts()) expect(t).not.toMatch(/\p{Extended_Pictographic}/u);
+  await page.locator('#goLearn').click();
+  await expect(page.locator('.wrap > h1')).toBeHidden();
+  await expect(page.locator('#topTitle')).toHaveText('学新词');
+  await expect(page.locator('#learnMapBtn svg')).toHaveCount(1);
+  await expect(page.locator('#learnSettingsBtn svg')).toHaveCount(1);
+  await page.locator('#modeBack').click();
+  await expect(page.locator('.wrap > h1')).toBeVisible();
+  await page.locator('#goQuiz').click();
+  await expect(page.locator('#topTitle')).toHaveText('单词检测');
+  await expect(page.locator('#quizSettingsBtn svg')).toHaveCount(1);
+  // the idle quiz page shows no dead zeros
+  await expect(page.locator('#sNow')).toBeHidden();
+});

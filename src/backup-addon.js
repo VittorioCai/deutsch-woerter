@@ -11,7 +11,7 @@ function LbackupStyles() {
   if (document.getElementById("backupStyles")) return;
   const st = document.createElement("style");
   st.id = "backupStyles";
-  st.textContent = `.backupOverlay{position:fixed;inset:0;z-index:9999;background:rgba(18,25,38,.58);display:flex;align-items:flex-end;justify-content:center}.backupOverlay.hidden{display:none}.backupSheet{background:#fff;width:min(620px,100%);max-height:92vh;border-radius:22px 22px 0 0;padding:18px;overflow:auto;box-shadow:0 -16px 50px rgba(0,0,0,.18)}.backupHead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}.backupHead h2{margin:0;font-size:23px}.backupRisk{border-radius:14px;padding:13px 14px;line-height:1.65;font-size:14px;border:1px solid}.backupRisk.ok{background:#edf9f3;border-color:#bfe9d4}.backupRisk.warn{background:#fff8e8;border-color:#f0dcae}.backupWay{border:1px solid var(--line);border-radius:14px;padding:13px;margin-top:10px}.backupWay h4{margin:0 0 3px;font-size:16px}.backupWay p{margin:0 0 10px;font-size:13px;color:var(--muted);line-height:1.6}.backupWay button{padding:9px 14px;font-size:13px}.backupWay.off{opacity:.55}@media(min-width:700px){.backupOverlay{align-items:center;padding:18px}.backupSheet{border-radius:22px;max-height:88vh}}`;
+  st.textContent = `.backupOverlay{position:fixed;inset:0;z-index:9999;background:rgba(18,25,38,.58);display:flex;align-items:flex-end;justify-content:center}.backupOverlay.hidden{display:none}.backupSheet{background:#fff;width:min(620px,100%);max-height:92vh;border-radius:20px 20px 0 0;padding:18px;overflow:auto;box-shadow:0 -16px 50px rgba(0,0,0,.18)}.backupHead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}.backupHead h2{margin:0;font-size:23px}.backupRisk{border-radius:14px;padding:13px 14px;line-height:1.65;font-size:14px;border:1px solid}.backupRisk.ok{background:#edf9f3;border-color:#bfe9d4}.backupRisk.warn{background:#fff8e8;border-color:#f0dcae}.backupWay{border:1px solid var(--line);border-radius:14px;padding:13px;margin-top:10px}.backupWay h4{margin:0 0 3px;font-size:16px}.backupWay p{margin:0 0 10px;font-size:13px;color:var(--muted);line-height:1.6}.backupWay button{padding:9px 14px;font-size:13px}.backupWay.off{opacity:.55}@media(min-width:700px){.backupOverlay{align-items:center;padding:18px}.backupSheet{border-radius:20px;max-height:88vh}}`;
   document.head.appendChild(st);
 }
 function LbuildBackupUI() {
@@ -20,7 +20,7 @@ function LbuildBackupUI() {
   const ov = document.createElement("div");
   ov.id = "backupOverlay";
   ov.className = "backupOverlay hidden";
-  ov.innerHTML = `<div class="backupSheet"><div class="backupHead"><h2>🛟 备份</h2><button class="secondary" id="backupClose">关闭</button></div><div id="backupContent"></div></div>`;
+  ov.innerHTML = `<div class="backupSheet"><div class="backupHead"><h2>备份</h2><button class="secondary" id="backupClose">关闭</button></div><div id="backupContent"></div></div>`;
   document.body.appendChild(ov);
   L$("backupClose").onclick = () => L$("backupOverlay").classList.add("hidden");
   ov.addEventListener("click", (e) => { if (e.target === ov) L$("backupOverlay").classList.add("hidden") });
@@ -103,7 +103,7 @@ async function LrenderBackupLine() {
     const text = auto ? `自动备份开着 · 写到 ${st.folder.name}`
       : st.at === 0 ? "还没有备份过"
       : `上次备份${st.days === 0 ? "就在今天" : `是 ${st.days} 天前`}，之后${LsinceText(st)}`;
-    el.textContent = `🛟 ${text}`;
+    el.innerHTML = `${Licon("shield", 15)} ${Lesc(text)}`;
     const line = L$("homeBackupLine");
     if (line) line.classList.toggle("stale", !!stale);
   } catch (e) { /* the line is a courtesy; the panel is the real thing */ }

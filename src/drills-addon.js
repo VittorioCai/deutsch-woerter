@@ -257,7 +257,7 @@ function LdrillPick(n) {
 
 function LdrillStyles() {
   const st = document.createElement("style");
-  st.textContent = `.drillOverlay{position:fixed;inset:0;z-index:9997;background:rgba(18,25,38,.58);display:flex;align-items:flex-end;justify-content:center}.drillOverlay.hidden{display:none}.drillSheet{background:#fff;width:min(760px,100%);max-height:92vh;border-radius:22px 22px 0 0;padding:18px;overflow:auto;box-shadow:0 -16px 50px rgba(0,0,0,.18)}.drillHead{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:-18px;background:#fff;padding:16px 0 10px;z-index:2}.drillHead h2{margin:0;font-size:24px}.drillGroups{display:grid;gap:8px;margin-bottom:12px}.drillGroupName{font-size:11px;font-weight:700;color:var(--muted);margin:0 0 4px 2px}.drillTabs{display:flex;gap:8px;flex-wrap:wrap}.drillTabs button{flex:1 1 28%;padding:9px 6px;font-size:13px;display:inline-flex;align-items:center;justify-content:center;gap:5px}.drillTabs button.off{opacity:.5}.drillN{font-size:11px;font-weight:600;background:rgba(0,0,0,.07);border-radius:999px;padding:1px 7px}.drillTabs button.on .drillN{background:rgba(255,255,255,.25)}.genderGrid.two{grid-template-columns:repeat(2,1fr)}.clozeSentence{font-size:clamp(18px,4.4vw,24px);line-height:1.8;text-align:center;margin:22px 0 8px;font-weight:650;word-break:break-word}.clozeBlank{display:inline-block;min-width:92px;border-bottom:3px solid var(--accent)}.clozeHit{color:var(--accent)}.drillTabs button.on{background:var(--accent);color:#fff}.drillWord{font-size:clamp(30px,8vw,46px);font-weight:800;text-align:center;margin:26px 0 6px;word-break:break-word}.drillHint{text-align:center;color:var(--muted);font-size:13px;margin-bottom:22px}.genderGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.genderGrid button{padding:20px 0;font-size:21px;font-weight:800}.genderGrid button.correct{background:#0a8f55;color:#fff}.genderGrid button.wrong{background:#c73737;color:#fff}.drillStats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.drillEmpty{text-align:center;padding:45px 10px;color:var(--muted)}.drillBreak{display:grid;gap:6px;margin-top:10px;font-size:13px;color:var(--muted)}.drillRow{display:flex;justify-content:space-between;gap:10px;padding:7px 10px;border:1px solid var(--line);border-radius:10px}@media(min-width:700px){.drillOverlay{align-items:center;padding:18px}.drillSheet{border-radius:22px;max-height:88vh}}`;
+  st.textContent = `.drillOverlay{position:fixed;inset:0;z-index:9997;background:rgba(18,25,38,.58);display:flex;align-items:flex-end;justify-content:center}.drillOverlay.hidden{display:none}.drillSheet{background:#fff;width:min(760px,100%);max-height:92vh;border-radius:20px 20px 0 0;padding:18px;overflow:auto;box-shadow:0 -16px 50px rgba(0,0,0,.18)}.drillHead{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:-18px;background:#fff;padding:16px 0 10px;z-index:2}.drillHead h2{margin:0;font-size:24px}.drillGroups{display:grid;gap:8px;margin-bottom:12px}.drillGroupName{font-size:11px;font-weight:700;color:var(--muted);margin:0 0 4px 2px}.drillTabs{display:flex;gap:8px;flex-wrap:wrap}.drillTabs button{flex:1 1 28%;padding:9px 6px;font-size:13px;display:inline-flex;align-items:center;justify-content:center;gap:5px}.drillTabs button.off{opacity:.5}.drillN{font-size:11px;font-weight:600;background:rgba(0,0,0,.07);border-radius:999px;padding:1px 7px}.drillTabs button.on .drillN{background:rgba(255,255,255,.25)}.genderGrid.two{grid-template-columns:repeat(2,1fr)}.clozeSentence{font-size:clamp(18px,4.4vw,24px);line-height:1.8;text-align:center;margin:22px 0 8px;font-weight:650;word-break:break-word}.clozeBlank{display:inline-block;min-width:92px;border-bottom:3px solid var(--accent)}.clozeHit{color:var(--accent)}.drillTabs button.on{background:var(--accent);color:#fff}.drillWord{font-size:clamp(30px,8vw,46px);font-weight:800;text-align:center;margin:26px 0 6px;word-break:break-word}.drillEar{color:var(--accent)}.drillHint{text-align:center;color:var(--muted);font-size:13px;margin-bottom:22px}.genderGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.genderGrid button{padding:20px 0;font-size:21px;font-weight:800}.genderGrid button.correct{background:#0a8f55;color:#fff}.genderGrid button.wrong{background:#c73737;color:#fff}.drillStats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.drillEmpty{text-align:center;padding:45px 10px;color:var(--muted)}.drillBreak{display:grid;gap:6px;margin-top:10px;font-size:13px;color:var(--muted)}.drillRow{display:flex;justify-content:space-between;gap:10px;padding:7px 10px;border:1px solid var(--line);border-radius:10px}@media(min-width:700px){.drillOverlay{align-items:center;padding:18px}.drillSheet{border-radius:20px;max-height:88vh}}`;
   document.head.appendChild(st);
 }
 function LbuildDrillUI() {
@@ -265,7 +265,7 @@ function LbuildDrillUI() {
   const ov = document.createElement("div");
   ov.id = "drillOverlay";
   ov.className = "drillOverlay hidden";
-  ov.innerHTML = `<div class="drillSheet"><div class="drillHead"><h2>🎲 专项训练</h2><button class="secondary" id="drillClose">关闭</button></div><div id="drillContent"></div></div>`;
+  ov.innerHTML = `<div class="drillSheet"><div class="drillHead"><h2>专项训练</h2><button class="secondary" id="drillClose">关闭</button></div><div id="drillContent"></div></div>`;
   document.body.appendChild(ov);
   L$("drillClose").onclick = LcloseDrill;
   ov.addEventListener("click", e => { if (e.target === ov) LcloseDrill() });
@@ -363,7 +363,7 @@ function LrenderDrill() {
   const box = L$("drillContent");
   if (drillPos >= drillQueue.length) {
     const pct = drillQueue.length ? Math.round(drillScore / drillQueue.length * 100) : 0;
-    box.innerHTML = `<div class="sessionDone"><div class="big">🎲</div><h2>本轮完成</h2><p class="sub">${drillScore} / ${drillQueue.length} 正确，正确率 ${pct}%。</p><div class="wrongActions"><button class="primary" id="drillAgain">再来 20 题</button><button class="secondary" id="drillBack">返回</button></div></div>`;
+    box.innerHTML = `<div class="sessionDone"><div class="big">🎉</div><h2>本轮完成</h2><p class="sub">${drillScore} / ${drillQueue.length} 正确，正确率 ${pct}%。</p><div class="wrongActions"><button class="primary" id="drillAgain">再来 20 题</button><button class="secondary" id="drillBack">返回</button></div></div>`;
     L$("drillAgain").onclick = LstartDrill;
     L$("drillBack").onclick = LrenderDrillHome;
     return;
@@ -372,7 +372,7 @@ function LrenderDrill() {
   const c = drillQueue[drillPos];
   const head = `<div class="wrongMini">${drillPos + 1} / ${drillQueue.length} · ${Lesc(c.level)} Kapitel ${Lesc(String(c.chapter))}</div>`;
   if (drillKind === "dictation") {
-    box.innerHTML = `${head}<div class="drillWord">🔊</div><div class="drillHint">听德语，写出这个词</div><div class="wrongActions" style="justify-content:center"><button class="primary" id="drillPlay">再听一遍</button></div><div class="wrongPracticeBox"><input id="drillAnswer" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="done" placeholder="写下你听到的…">${LcharBar("drillAnswer")}<div class="wrongActions"><button class="primary" id="drillCheck">检查</button><button class="secondary" id="drillShow">听不出</button></div></div><div id="drillFeedback"></div>`;
+    box.innerHTML = `${head}<div class="drillWord drillEar">${Licon("speaker",44)}</div><div class="drillHint">听德语，写出这个词</div><div class="wrongActions" style="justify-content:center"><button class="primary" id="drillPlay">再听一遍</button></div><div class="wrongPracticeBox"><input id="drillAnswer" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="done" placeholder="写下你听到的…">${LcharBar("drillAnswer")}<div class="wrongActions"><button class="primary" id="drillCheck">检查</button><button class="secondary" id="drillShow">听不出</button></div></div><div id="drillFeedback"></div>`;
     const input = L$("drillAnswer");
     L$("drillPlay").onclick = () => Lspeak(c.de);
     L$("drillCheck").onclick = () => LanswerDictation(c, false);
@@ -527,7 +527,7 @@ function LinitDrillUI() {
     const b = document.createElement("button");
     b.id = "learnDrillBtn";
     b.className = "secondary";
-    b.textContent = "🎲 专项训练";
+    b.textContent = "专项训练";
     anchor.after(b);
     b.onclick = () => LopenDrill();
   }

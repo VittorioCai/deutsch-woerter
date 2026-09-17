@@ -66,12 +66,12 @@ function LbrowseStyles() {
   if (document.getElementById("browseStyles")) return;
   const st = document.createElement("style");
   st.id = "browseStyles";
-  st.textContent = `.posBar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:nowrap;background:var(--soft);border:1px solid #d7deff;border-radius:14px;padding:11px 14px;margin-bottom:12px}.posBar:empty{display:none}.posNow{font-size:14px;line-height:1.5;min-width:0;flex:1 1 auto}.posBar>button{flex:0 0 auto;white-space:nowrap}.posAsk{display:flex;flex-direction:column;gap:3px;flex:1 1 220px}.posBar button{padding:8px 14px;font-size:13px}
-.browseOverlay{position:fixed;inset:0;z-index:9998;background:rgba(18,25,38,.58);display:flex;align-items:flex-end;justify-content:center}.browseOverlay.hidden{display:none}.browseSheet{background:#fff;width:min(760px,100%);max-height:92vh;border-radius:22px 22px 0 0;padding:18px;overflow:auto;box-shadow:0 -16px 50px rgba(0,0,0,.18)}.browseHead{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:-18px;background:#fff;padding:16px 0 10px;z-index:2}.browseHead h2{margin:0;font-size:24px}#browseInput{margin-bottom:6px}
+  st.textContent = `.posBar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:nowrap;margin-bottom:12px;color:var(--muted)}.posNow b{color:var(--ink)}.posBar:empty{display:none}.posNow{font-size:13px;line-height:1.5;min-width:0;flex:1 1 auto}.posBar>button{flex:0 0 auto;white-space:nowrap}.posAsk{display:flex;flex-direction:column;gap:3px;flex:1 1 220px}.posBar button{padding:7px 12px;font-size:13px}.browseCount{font-size:13px;color:var(--muted);margin:8px 2px 10px}.browseEmptyIcon{color:#c3cad8}#browseInput{border:1px solid #cfd5e2;box-shadow:none}
+.browseOverlay{position:fixed;inset:0;z-index:9998;background:rgba(18,25,38,.58);display:flex;align-items:flex-end;justify-content:center}.browseOverlay.hidden{display:none}.browseSheet{background:#fff;width:min(760px,100%);max-height:92vh;border-radius:20px 20px 0 0;padding:18px;overflow:auto;box-shadow:0 -16px 50px rgba(0,0,0,.18)}.browseHead{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:-18px;background:#fff;padding:16px 0 10px;z-index:2}.browseHead h2{margin:0;font-size:24px}#browseInput{margin-bottom:6px}
 .mapLevel{margin-top:14px}.mapLevel h3{margin:0 0 8px;font-size:15px;color:var(--muted)}.mapGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}.mapTile{text-align:left;background:#fff;border:1px solid var(--line);border-radius:12px;padding:9px 10px;font-weight:700;font-size:13px;cursor:pointer}.mapTile.on{border-color:var(--accent);box-shadow:0 0 0 2px rgba(49,94,251,.16)}.mapTile.here{background:var(--soft)}.mapBar{height:6px;border-radius:99px;background:#e9edf5;overflow:hidden;margin:7px 0 5px;display:flex}.mapBar i{display:block;height:100%}.mapBar .m{background:#0a8f55}.mapBar .l{background:#4a69ff}.mapCount{font-size:11px;color:var(--muted);font-weight:600}
 .mapActions{border:1px solid var(--line);border-radius:14px;padding:13px;margin-top:12px;background:#fbfcff}.mapActions h4{margin:0 0 4px;font-size:17px}.mapActions .row{margin-top:10px}.mapActions button{padding:9px 13px;font-size:13px}
 .browseList{display:grid;gap:8px;margin-top:10px}.browseItem{border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:#fff}.browseTop{display:flex;justify-content:space-between;gap:10px;align-items:baseline}.browseWord{font-size:19px;font-weight:800}.browseTag{font-size:11px;font-weight:700;border-radius:999px;padding:3px 9px;white-space:nowrap}.browseTag.fresh{background:#eef1f6;color:var(--muted)}.browseTag.learning{background:#eaf0ff;color:#3a53bf}.browseTag.due{background:#fff2e2;color:#a4620f}.browseTag.mastered{background:#e7f6ee;color:var(--good)}.browseWhere{font-size:12px;color:var(--muted);margin-top:5px}.browseEmpty{text-align:center;padding:38px 10px;color:var(--muted)}.browseActs{display:flex;gap:8px;align-items:center;margin-top:10px}.browseActs button{padding:7px 12px;font-size:13px}.browseActs .iconBtn{padding:7px 10px}.browseWord .speakBtn{font-size:14px;padding:2px 8px;vertical-align:middle}.mapLegend{display:inline-flex;align-items:center;gap:4px;margin-left:8px;font-size:12px;color:var(--muted)}.mapLegend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-left:8px}.mapLegend .m{background:#0a8f55}.mapLegend .l{background:#4a69ff}
-@media(min-width:700px){.browseOverlay{align-items:center;padding:18px}.browseSheet{border-radius:22px;max-height:88vh}}`;
+@media(min-width:700px){.browseOverlay{align-items:center;padding:18px}.browseSheet{border-radius:20px;max-height:88vh}}`;
   document.head.appendChild(st);
 }
 
@@ -88,7 +88,7 @@ function LrenderPosBar() {
     // move the position, so the bar says so instead of letting the two disagree
     // in silence.
     const sc = Lscope(), elsewhere = sc.level !== g.level || String(sc.chapter) !== g.chapter;
-    el.innerHTML = `<div class="posNow">📍 学到 <b>${Lesc(g.level)} Kapitel ${Lesc(g.chapter)}</b> · 还有 <b>${left}</b> 个新词${elsewhere ? `<br><span class="small">学新词页上次在看 ${Lesc(sc.level)} Kapitel ${Lesc(String(sc.chapter))}</span>` : ""}</div><button class="secondary" id="posEdit">换一章</button>`;
+    el.innerHTML = `<div class="posNow">${Licon("pin",15)} 学到 <b>${Lesc(g.level)} Kapitel ${Lesc(g.chapter)}</b> · 还有 <b>${left}</b> 个新词${elsewhere ? `<br><span class="small">学新词页上次在看 ${Lesc(sc.level)} Kapitel ${Lesc(String(sc.chapter))}</span>` : ""}</div><button class="secondary" id="posEdit">换一章</button>`;
   } else {
     el.innerHTML = `<div class="posAsk"><b>你已经学到哪一章了？</b><span class="small">不说的话，今日任务会从词库第一章开始给新词。</span></div><button class="primary" id="posEdit">告诉它</button>`;
   }
@@ -101,7 +101,7 @@ function LbuildBrowseUI() {
   const ov = document.createElement("div");
   ov.id = "browseOverlay";
   ov.className = "browseOverlay hidden";
-  ov.innerHTML = `<div class="browseSheet"><div class="browseHead"><h2>🔍 查词 · 章节地图</h2><button class="secondary" id="browseClose">关闭</button></div><input id="browseInput" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="德语、中文或英文都能查…"><div id="browseBody"></div></div>`;
+  ov.innerHTML = `<div class="browseSheet"><div class="browseHead"><h2>查词 · 章节地图</h2><button class="secondary" id="browseClose">关闭</button></div><input id="browseInput" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="德语、中文或英文都能查…"><div id="browseBody"></div></div>`;
   document.body.appendChild(ov);
   L$("browseClose").onclick = LcloseBrowse;
   ov.addEventListener("click", (e) => { if (e.target === ov) LcloseBrowse(); });
@@ -121,7 +121,7 @@ function LcloseBrowse() { L$("browseOverlay").classList.add("hidden"); }
 function LmapTile(g, i) {
   const st = LchapStat(g), here = LposGroup() === g;
   const pct = (n) => `${Math.round((n / Math.max(1, st.total)) * 100)}%`;
-  return `<button class="mapTile ${browsePick === i ? "on" : ""} ${here ? "here" : ""}" data-i="${i}">Kapitel ${Lesc(g.chapter)}${here ? " 📍" : ""}<div class="mapBar"><i class="m" style="width:${pct(st.mastered)}"></i><i class="l" style="width:${pct(st.learning + st.due)}"></i></div><div class="mapCount">${st.done}/${st.total} 学过</div></button>`;
+  return `<button class="mapTile ${browsePick === i ? "on" : ""} ${here ? "here" : ""}" data-i="${i}">Kapitel ${Lesc(g.chapter)}${here ? " " + Licon("pin", 13) : ""}<div class="mapBar"><i class="m" style="width:${pct(st.mastered)}"></i><i class="l" style="width:${pct(st.learning + st.due)}"></i></div><div class="mapCount">${st.done}/${st.total} 学过</div></button>`;
 }
 function LmapActions(i) {
   const gs = LchapGroups(), g = gs[i], st = LchapStat(g);
@@ -134,13 +134,13 @@ function LrenderBrowse() {
   if (q) {
     const hits = LbrowseFind(q);
     box.innerHTML = hits.length
-      ? `<div class="coverage">找到 <b>${hits.length}</b> 个${hits.length > LBROWSE_LIMIT ? `，先显示前 ${LBROWSE_LIMIT} 个` : ""}。</div><div class="browseList">${hits.slice(0, LBROWSE_LIMIT).map(LbrowseRow).join("")}</div>`
-      : `<div class="browseEmpty"><div style="font-size:40px">🔍</div><h3>词库里没有「${Lesc(q)}」</h3><p class="small">德语、中文、英文和词形栏都查了。变音字母可以不打，<code>tur</code> 和 <code>tuer</code> 都能找到 <code>die Tür</code>。</p></div>`;
+      ? `<div class="browseCount">找到 <b>${hits.length}</b> 个${hits.length > LBROWSE_LIMIT ? `，先显示前 ${LBROWSE_LIMIT} 个` : ""}。</div><div class="browseList">${hits.slice(0, LBROWSE_LIMIT).map(LbrowseRow).join("")}</div>`
+      : `<div class="browseEmpty"><div class="browseEmptyIcon">${Licon("search",40)}</div><h3>词库里没有「${Lesc(q)}」</h3><p class="small">德语、中文、英文和词形栏都查了。变音字母可以不打，<code>tur</code> 和 <code>tuer</code> 都能找到 <code>die Tür</code>。</p></div>`;
     return;
   }
   const gs = LchapGroups(), byLevel = new Map();
   gs.forEach((g, i) => { if (!byLevel.has(g.level)) byLevel.set(g.level, []); byLevel.get(g.level).push(i); });
-  box.innerHTML = `<div class="coverage">共 ${gs.length} 章 · ${LallLearningCards().length} 个词。<b>📍 是今日任务取新词的位置</b>，点任意一章可以改。<span class="mapLegend"><i class="m"></i>已掌握<i class="l"></i>学习中</span></div>`
+  box.innerHTML = `<div class="coverage">共 ${gs.length} 章 · ${LallLearningCards().length} 个词。<b>${Licon("pin",13)} 标记的是今日任务取新词的位置</b>，点任意一章可以改。<span class="mapLegend"><i class="m"></i>已掌握<i class="l"></i>学习中</span></div>`
     + [...byLevel.entries()].map(([lv, idx]) => `<div class="mapLevel"><h3>${Lesc(lv)}</h3><div class="mapGrid">${idx.map((i) => LmapTile(gs[i], i)).join("")}</div></div>`).join("")
     + (browsePick == null ? "" : LmapActions(browsePick));
   box.querySelectorAll(".mapTile").forEach((b) => { b.onclick = () => { const i = +b.dataset.i; browsePick = browsePick === i ? null : i; LrenderBrowse(); }; });
@@ -151,7 +151,7 @@ function LrenderBrowse() {
 // results with five large 改 buttons were more button than information.
 function LbrowseRow(c) {
   const st = LcardStatus(c), zh = LhasZh(c) ? Lmeaning(c) : "", en = Lenglish(c);
-  return `<div class="browseItem"><div class="browseTop"><div class="browseWord">${Lesc(c.de)} ${LspeakBtn(c.de)}</div><span class="browseTag ${st.key}">${st.label}</span></div><div>${zh ? `${Lesc(zh)}${en ? ` <span class="browseWhere">· ${Lesc(en)}</span>` : ""}` : Lesc(en)}</div><div class="browseWhere">${Lesc(c.level)} · Kapitel ${Lesc(String(c.chapter))}${c.grammar ? ` · ${Lesc(c.grammar)}` : ""}</div>${c.example ? `<div class="browseWhere">${Lesc(LexampleDe(c))}</div>` : ""}<div class="browseActs"><button type="button" class="secondary" data-learn="${Lesc(c.id)}">${st.key === "fresh" ? "学这个" : "复习这个"}</button><button type="button" class="secondary iconBtn" data-edit="${Lesc(c.id)}" title="编辑词条" aria-label="编辑词条">✏️</button></div></div>`;
+  return `<div class="browseItem"><div class="browseTop"><div class="browseWord">${Lesc(c.de)} ${LspeakBtn(c.de)}</div><span class="browseTag ${st.key}">${st.label}</span></div><div>${zh ? `${Lesc(zh)}${en ? ` <span class="browseWhere">· ${Lesc(en)}</span>` : ""}` : Lesc(en)}</div><div class="browseWhere">${Lesc(c.level)} · Kapitel ${Lesc(String(c.chapter))}${c.grammar ? ` · ${Lesc(c.grammar)}` : ""}</div>${c.example ? `<div class="browseWhere">${Lesc(LexampleDe(c))}</div>` : ""}<div class="browseActs"><button type="button" class="secondary" data-learn="${Lesc(c.id)}">${st.key === "fresh" ? "学这个" : "复习这个"}</button><button type="button" class="secondary iconBtn" data-edit="${Lesc(c.id)}" title="编辑词条" aria-label="编辑词条">${Licon("pencil",17)}</button></div></div>`;
 }
 // One word, right now: the same queue a chapter round builds, for a single card.
 // A word not yet met gets its introduction; one already met gets a review.
@@ -221,7 +221,7 @@ function LinitBrowseUI() {
     const b = document.createElement("button");
     b.id = "learnBrowseBtn";
     b.className = "secondary";
-    b.textContent = "🔍 查词";
+    b.textContent = "查词";
     anchor.after(b);
     b.onclick = () => LopenBrowse("");
   }
