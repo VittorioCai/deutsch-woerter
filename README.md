@@ -26,7 +26,7 @@
 </tr>
 <tr>
 <td width="50%"><img src="docs/screenshots/08-compound.png" alt="A word explained"><br><sub><b>Why the word is what it is.</b> Gender from the ending, compounds taken apart, plurals derived — computed from the word, for any deck.</sub></td>
-<td width="50%"><img src="docs/screenshots/05-drill.png" alt="Gender drill"><br><sub><b>Drills for what spelling checks miss:</b> der/die/das, plural forms, dictation.</sub></td>
+<td width="50%"><img src="docs/screenshots/05-drill.png" alt="Gender drill"><br><sub><b>Drills for what spelling checks miss:</b> der/die/das, plurals, conjugation, haben/sein, preposition + case, cloze, dictation.</sub></td>
 </tr>
 </table>
 
@@ -48,18 +48,36 @@ starter deck written for this project, so the app is useful the second you open 
   what you study; the chapter pickers are there when you want them, not on the
   daily path. Words you have already mastered come back for the occasional spot
   check too — answering right three times is not the same as knowing a word a
-  year later.
+  year later. New words start from the Kapitel you say you are on and move
+  forward; only once nothing is left ahead does it go back for what was skipped.
 - **学新词 — staged learning.** Meet the word → recognise its meaning → recall the
   German → spell it, with spaced review in between. Spelling can be switched off
   for a recognition-only session; those words still advance through the review
   intervals but cannot reach 已掌握, which here means *you can produce the word*,
   not just recognise it.
 - **单词检测 — the quiz.** Weak words first, both directions, spelling checked,
-  articles optional or strict.
-- **专项训练 — targeted drills.** der/die/das, plural forms derived from the grammar
-  column, whether the perfect takes haben or sein, filling a word back into its own
-  example sentence, and dictation. These test the things a spelling check quietly
-  accepts, and every question is computed from the word list you imported.
+  articles optional or strict. It keeps **one book with 学新词**: answering here
+  pushes that word's next review out, missing it drops the word back into the
+  queue, and the feedback says so. The link runs the other way too — with weak
+  words prioritised, whatever is due today comes up first.
+- **专项训练 — seven targeted drills.** der/die/das, plural forms derived from the
+  grammar column, **conjugation** (`nehmen → er nimmt`, a separable prefix thrown
+  to the end of the clause, the Präteritum where a B1 entry carries one), whether
+  the perfect takes haben or sein, **preposition and case** (`warten auf` +
+  Akkusativ — examined at B1 and untestable by a spelling check), filling a word
+  back into its own example sentence, and dictation. These test the things a
+  spelling check quietly accepts, and every question is computed from the word
+  list you imported.
+- **查词 — search and a chapter map.** One panel: empty it is a map of all 36
+  Kapitel with your progress in each, type and it becomes a search over German,
+  Chinese, English and the word-form column. Umlauts are optional — `tur` and
+  `tuer` both find `die Tür`. From the map you can start at a chapter or mark a
+  whole one known.
+- **Editing a word in place.** Meaning, word forms and example sentence can be
+  corrected from the app. Corrections are a patch layer keyed by card id, so
+  **re-importing the word list does not undo them**, and they travel in backups.
+  The German headword itself is not editable: changing it would reset that
+  word's history.
 - **Real pronunciation.** Native recordings from [Wikimedia
   Commons](https://commons.wikimedia.org/) where they exist (~90% of common words),
   cached after first play; otherwise the best German voice the device has, ranked
@@ -120,6 +138,12 @@ Progress, the spelling wrong-book and the mastered archive live in
 `localStorage`; the word list lives in IndexedDB. Nothing is sent anywhere — which
 also means nothing is backed up for you:
 
+- **Backup** (🛟 on the home screen) offers whatever the device can do: desktop
+  Chrome/Edge can pick a folder and write to it on every visit — point it at an
+  iCloud or Drive folder and it is synced, with no server and no account; a phone
+  gets the system share sheet; everything else downloads a JSON. The reminder
+  fires on how much you have learnt since the last backup, not only on elapsed
+  days, and an automatic backup always keeps the copy it replaces.
 - **导出学习记录** writes a JSON backup. Do it now and then; a browser that clears
   site data takes your history with it. The app nags after 30 days.
 - **导入学习记录** merges by default (newer record wins per word) rather than
@@ -159,7 +183,7 @@ written to `dist/`. It runs as part of `npm run dev`, `npm test` and
 | Edit | Generated into `dist/` |
 | --- | --- |
 | `src/index.html`, `learn.css`, `icon.svg`, `app.webmanifest`, `starter-deck.json` | copied as-is |
-| `src/learn.core.js`, `insight.js`, `wrongbook-addon.js`, `mastered-addon.js`, `drills-addon.js`, `md5.js` | `learn.js` |
+| `src/learn.core.js`, `insight.js`, `wrongbook-addon.js`, `mastered-addon.js`, `drills-addon.js`, `browse-addon.js`, `backup-addon.js`, `edit-addon.js`, `link-addon.js`, `md5.js` | `learn.js` |
 | `src/store.js` | `store.js` |
 | `src/deck.js` | `deck.js` |
 | `src/sw.source.js` | `sw.js` |

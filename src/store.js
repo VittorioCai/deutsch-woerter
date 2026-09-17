@@ -14,7 +14,17 @@
   const PREFS = "netzwerk_vocab_prefs_v1";
   const SCHEMA_VERSION = 2;
   const FLUSH_MS = 1500;
+  const BACKUP_AT_WORK = "netzwerk_vocab_last_backup_work";
+  const BACKUP_AT_WORDS = "netzwerk_vocab_last_backup_words";
   const BACKUP_REMINDER_DAYS = 14;
+  // A year of study in one browser is the whole risk, and it does not accumulate
+  // on a calendar — somebody who gets through four hundred words in a week is
+  // more exposed than somebody who got through ten in a fortnight. Either enough
+  // time or enough unsaved work now asks.
+  const BACKUP_REMINDER_WORK = 60;
+  const BACKUP_FILE = "deutsch-woerter-backup.json";
+  const BACKUP_PREV = "deutsch-woerter-backup-previous.json";
+  const BACKUP_DIR_KEY = "backup-dir";
 
   const pending = new Map();
   const rehydrators = [];
@@ -132,6 +142,71 @@
   }
   const download = (name, obj) => downloadText(name, JSON.stringify(obj, null, 2));
 
+  // How much study is in the store, as a number that only ever grows. Entry
+  // counts alone would sit still through a month of review, so each learnt word
+  // also counts its completed cycles.
+  function workUnits() {
+    let n = 0;
+    try {
+      const l = read(LEARN, {});
+      for (const k in l) { const s = l[k]; n += 1 + (s && +s.cycles > 0 ? +s.cycles : 0) + (s && s.known ? 1 : 0); }
+      n += Object.keys(read(QUIZ, {})).length + Object.keys(read(WRONG, {})).length;
+    } catch (_) { return 0; }
+    return n;
+  }
+  // How many words have been met at all. Counted apart from the work units
+  // because the two answer different questions and only one of them can be put
+  // in a sentence: a month of review moves the units and not this, so reporting
+  // units as "words you have learnt" would be saying something untrue.
+  function wordCount() {
+    try { return Object.keys(read(LEARN, {})).length; } catch (_) { return 0; }
+  }
+  const readNum = (k) => { try { return +(localStorage.getItem(k) || 0) || 0; } catch (_) { return 0; } };
+
+  // The File System Access API is desktop Chromium only. Everywhere else the
+  // share sheet is the real equivalent — it is how a file gets to iCloud or
+  // Drive on a phone — and a plain download is the last resort.
+  const canFolder = () => typeof window !== "undefined" && typeof window.showDirectoryPicker === "function";
+  const canShare = () => {
+    try {
+      return !!(navigator.canShare && navigator.share
+        && navigator.canShare({ files: [new File(["{}"], BACKUP_FILE, { type: "application/json" })] }));
+    } catch (_) { return false; }
+  };
+  const deckStore = () => (typeof window !== "undefined" && window.DWDeck) || null;
+  async function backupDir() {
+    const d = deckStore();
+    if (!d || !d.getMeta) return null;
+    try { return (await d.getMeta(BACKUP_DIR_KEY)) || null; } catch (_) { return null; }
+  }
+  async function dirPermission(handle, ask) {
+    if (!handle || !handle.queryPermission) return "unsupported";
+    try {
+      const opts = { mode: "readwrite" };
+      let state = await handle.queryPermission(opts);
+      if (state !== "granted" && ask) state = await handle.requestPermission(opts);
+      return state;
+    } catch (_) { return "denied" }
+  }
+  // Written as two files, never one: overwriting the only copy is the moment a
+  // backup can destroy what it exists to protect. The previous good file is
+  // copied aside first, so a failed or truncated write still leaves one.
+  async function writeInto(handle, text) {
+    try {
+      const cur = await handle.getFileHandle(BACKUP_FILE).then((h) => h.getFile()).catch(() => null);
+      if (cur) {
+        const prev = await handle.getFileHandle(BACKUP_PREV, { create: true });
+        const pw = await prev.createWritable();
+        await pw.write(await cur.text());
+        await pw.close();
+      }
+    } catch (_) { /* no previous copy to keep is not a reason to skip the backup */ }
+    const f = await handle.getFileHandle(BACKUP_FILE, { create: true });
+    const w = await f.createWritable();
+    await w.write(text);
+    await w.close();
+  }
+
   const api = {
     KEYS: { QUIZ, LEARN, WRONG },
     read, queue, flush, notice,
@@ -156,18 +231,71 @@
 
     snapshot() {
       return {
-        version: 5,
+        version: 6,
         schema: SCHEMA_VERSION,
         exportedAt: new Date().toISOString(),
         quizProgress: read(QUIZ, {}),
         learnProgress: read(LEARN, {}),
         spellingWrongBook: read(WRONG, {}),
+        // Corrections made inside the app are the learner's work too, and they
+        // are not in the word list they correct — a backup without them loses
+        // every fix on restore.
+        cardPatches: (typeof window !== "undefined" && window.DWPatches) ? window.DWPatches.get() : {},
       };
     },
 
     exportBackup() {
       download("netzwerk_vocab_all_progress_backup.json", api.snapshot());
-      try { localStorage.setItem(BACKUP_AT, String(Date.now())); } catch (_) {}
+      api.markBackedUp();
+    },
+
+    // ---- backup, on whatever this device can actually do --------------------
+    backupWays() { return { folder: canFolder(), share: canShare() } },
+    async backupState() {
+      const at = readNum(BACKUP_AT), dir = await backupDir();
+      return {
+        at,
+        days: at ? Math.floor((Date.now() - at) / 86400000) : null,
+        since: Math.max(0, workUnits() - readNum(BACKUP_AT_WORK)),
+        sinceWords: Math.max(0, wordCount() - readNum(BACKUP_AT_WORDS)),
+        folder: dir ? { name: dir.name || "已选文件夹", permission: await dirPermission(dir, false) } : null,
+        ways: api.backupWays(),
+      };
+    },
+    // Picking the folder is the whole feature: point it at an iCloud or Drive
+    // folder and the backup is synced off the device without a server here.
+    async chooseBackupFolder() {
+      if (!canFolder()) throw new Error("这个浏览器不支持选择文件夹（目前只有电脑版 Chrome / Edge 支持）。");
+      const handle = await window.showDirectoryPicker({ mode: "readwrite", id: "dw-backup" });
+      const d = deckStore();
+      if (!d || !d.putMeta) throw new Error("本地数据库不可用，记不住这个文件夹。");
+      await d.putMeta(BACKUP_DIR_KEY, handle);
+      return api.runBackup({ ask: true });
+    },
+    async forgetBackupFolder() {
+      const d = deckStore();
+      if (d && d.delMeta) await d.delMeta(BACKUP_DIR_KEY);
+    },
+    async shareBackup() {
+      const file = new File([JSON.stringify(api.snapshot(), null, 2)], BACKUP_FILE, { type: "application/json" });
+      await navigator.share({ files: [file], title: "Deutsch Wörter 学习记录备份" });
+      api.markBackedUp();
+    },
+    // Returns what happened rather than announcing it: at startup a silent
+    // success is the point, and only the caller knows whether a person is
+    // watching.
+    async runBackup({ ask = false } = {}) {
+      const dir = await backupDir();
+      if (!dir) return { done: false, why: "no-folder" };
+      const state = await dirPermission(dir, ask);
+      if (state !== "granted") return { done: false, why: "permission", folder: dir.name || "" };
+      try {
+        await writeInto(dir, JSON.stringify(api.snapshot(), null, 2));
+        api.markBackedUp();
+        return { done: true, folder: dir.name || "" };
+      } catch (e) {
+        return { done: false, why: "write", error: String((e && e.message) || e), folder: dir.name || "" };
+      }
     },
 
     // Progress keys used to be `${level}-${chapter}-${lineNumber}`, so inserting a
@@ -177,7 +305,7 @@
     migrate(cards) {
       let done = 0;
       try { done = +(localStorage.getItem(SCHEMA) || 0); } catch (_) { return; }
-      if (done >= SCHEMA_VERSION) return api.backupReminder();
+      if (done >= SCHEMA_VERSION) return void api.backupReminder().catch(() => {});
       flush();
 
       const legacy = new Map();
@@ -210,7 +338,7 @@
 
       if (moved === 0 && dropped === 0) {
         try { localStorage.setItem(SCHEMA, String(SCHEMA_VERSION)); } catch (_) {}
-        return api.backupReminder();
+        return void api.backupReminder().catch(() => {});
       }
 
       // The old state goes to disk before anything is overwritten.
@@ -235,23 +363,52 @@
       api.__before = before;
     },
 
-    backupReminder() {
-      let at = 0;
-      try { at = +(localStorage.getItem(BACKUP_AT) || 0); } catch (_) { return; }
-      const days = at ? (Date.now() - at) / 86400000 : Infinity;
-      if (days < BACKUP_REMINDER_DAYS) return;
-      const learnCount = Object.keys(read(LEARN, {})).length;
-      if (learnCount < 50) return;
-      notice(
-        "warn",
-        at
-          ? `距离上次备份已经 <b>${Math.floor(days)}</b> 天了。浏览器可能在长时间不用后清除本站数据，建议导出一份。`
-          : "学习记录只存在这台设备的浏览器里，<b>还没有备份过</b>。浏览器清理数据或换设备都会丢失，建议导出一份。",
-        [{ label: "导出备份", run: row => { api.exportBackup(); row.remove(); } }],
-      );
+    // Runs once a page load. A folder that is still permitted is written to
+    // without saying anything — an automatic backup that announces itself every
+    // morning is an automatic backup people turn off.
+    async backupReminder() {
+      const st = await api.backupState().catch(() => null);
+      if (!st) return;
+      if (st.folder && st.folder.permission === "granted") {
+        if (!st.since) return;
+        const r = await api.runBackup();
+        if (r.done) return;
+        notice("warn", `<b>自动备份没写成</b>（${esc(r.error || "文件夹不可用")}）。学习记录还在这台设备上，但那份副本没更新。`,
+          [{ label: "重新选文件夹", run: (row) => { api.chooseBackupFolder().then(() => row.remove()).catch(() => {}) } }]);
+        return;
+      }
+      if (st.folder) {
+        // Chromium drops the grant between sessions; re-asking needs a click, so
+        // the notice is the click.
+        notice("warn", `自动备份的文件夹 <b>${esc(st.folder.name)}</b> 需要你再授权一次，浏览器重启后会这样。`,
+          [{ label: "恢复自动备份", run: (row) => { api.runBackup({ ask: true }).then((r) => { if (r.done) row.remove() }) } }]);
+        return;
+      }
+      const days = st.at ? st.days : null;
+      if (days !== null && days < BACKUP_REMINDER_DAYS && st.since < BACKUP_REMINDER_WORK) return;
+      if (days === null && st.since < BACKUP_REMINDER_WORK) return;
+      // The home screen carries a standing backup line that turns amber on the
+      // same conditions and opens the same panel. Where it exists, a notice on
+      // top of it would be the same reminder twice, on every page.
+      if (document.getElementById("homeBackupLine")) return;
+      const what = days === null
+        ? "一年的学习记录只存在这台设备的浏览器里，<b>还没有备份过</b>。清一次缓存、换台设备，就全没了。"
+        : `距离上次备份 <b>${days}</b> 天${st.sinceWords ? `，之后你又学了 <b>${st.sinceWords}</b> 个新词` : "，之后你又复习了不少"}。浏览器可能在长时间不用后清除本站数据。`;
+      const actions = [];
+      if (st.ways.folder) actions.push({ label: "选个文件夹自动备份", run: (row) => { api.chooseBackupFolder().then(() => row.remove()).catch(() => {}) } });
+      if (st.ways.share) actions.push({ label: "发送备份…", run: (row) => { api.shareBackup().then(() => row.remove()).catch(() => {}) } });
+      actions.push({ label: "导出文件", run: (row) => { api.exportBackup(); row.remove() } });
+      notice("warn", what, actions);
     },
 
-    markBackedUp() { try { localStorage.setItem(BACKUP_AT, String(Date.now())); } catch (_) {} },
+    markBackedUp() {
+      try {
+        localStorage.setItem(BACKUP_AT, String(Date.now()));
+        localStorage.setItem(BACKUP_AT_WORK, String(workUnits()));
+        localStorage.setItem(BACKUP_AT_WORDS, String(wordCount()));
+      } catch (_) {}
+    },
+    workUnits, wordCount,
     download,
     downloadText,
   };

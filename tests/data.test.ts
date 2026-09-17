@@ -401,7 +401,8 @@ describe('what the grammar and example columns encode', () => {
     LclozeSpan(c: Card): Span | null;
     LclozeAccepted(c: Card, span: Span, input: string): boolean;
   }>('drills-addon.js', '{ LauxOf, LclozeSpan, LclozeAccepted }',
-    { DWStore: DWStoreStub, document: documentStub, LexampleDe: learn.LexampleDe, Lnorm: learn.Lnorm });
+    { DWStore: DWStoreStub, document: documentStub, LexampleDe: learn.LexampleDe, Lnorm: learn.Lnorm,
+      DWInsight: load<any>('insight.js', 'DWInsight') });
 
   describe('reflexive verbs', () => {
     // `sich` is shown in the meaning column and nowhere else, so scoring against
@@ -543,15 +544,85 @@ describe('when a word comes back', () => {
     expect(at(12)).toBe(90 * DAY);
   });
 
-  it('brings a word flagged 很难记 back in half the time', () => {
-    const { Linterval } = srs();
-    // the flag was written on every card and read by nothing
-    expect(Linterval({ cycles: 2, hard: 1, spellingPass: false })).toBe(1.5 * DAY);
-    expect(Linterval({ cycles: 3, hard: 2, spellingPass: false })).toBe(7 * DAY);
-    // and it stops shortening once the word has been written from memory
-    expect(Linterval({ cycles: 2, hard: 1, spellingPass: true })).toBe(3 * DAY);
-    // never below the within-session floor
-    expect(Linterval({ cycles: 0, hard: 3, spellingPass: false })).toBe(10 * 60 * 1000);
+  // The lapse used to leave the word due in ten minutes, so every mistake made
+  // in a round came straight back as 到期复习 on the home screen: the more you
+  // got wrong, the longer the list, and the list is what people feel.
+  describe('a missed question is asked again before the round ends', () => {
+    type Q = { type: string; c: { id: string }; spot?: boolean; retry?: boolean; tries?: number };
+    const round = (progress: Record<string, S> = {}, spelling = true) => {
+      const api = load<{
+        Lrecord(c: { id: string }, ok: boolean, type: string): { again: boolean; tomorrow: boolean };
+        Lstate(c: { id: string }): S;
+        Lmastered(s: S): boolean;
+        queue(): Q[];
+        start(q: Q[]): void;
+        advance(): void;
+      }>('learn.core.js', '{ Lrecord, Lstate, Lmastered, queue: () => learnQueue, start: (q) => { learnQueue = q; learnPos = 0; learnSpelling = spelling }, advance: () => { learnPos++ } }', {
+        DWStore: { KEYS: { LEARN: 'l' }, read: () => progress, onMigrated: () => {}, prefs: () => ({}), queue: () => {} },
+        // Lsave refreshes the counters after every answer; the stub has no elements
+        document: { ...documentStub, getElementById: () => null },
+        CARDS: [],
+        spelling,
+      });
+      return api;
+    };
+    const w = { id: 'w' };
+    const HOUR = 60 * 60 * 1000;
+
+    it('appends the same question to the end of the round, once', () => {
+      const api = round();
+      api.start([{ type: 'spell', c: w }]);
+      const r = api.Lrecord(w, false, 'spell');
+      expect(r.again).toBe(true);
+      expect(api.queue()).toHaveLength(2);
+      expect(api.queue()[1]).toMatchObject({ type: 'spell', c: w, retry: true, tries: 1 });
+      // until it is answered, the word is only a ten-minute lapse (an abandoned round)
+      expect((api.Lstate(w).due as number) - Date.now()).toBeLessThanOrEqual(10 * 60 * 1000);
+    });
+
+    it('sends a repaired word to tomorrow with no cycle credit', () => {
+      const api = round();
+      api.start([{ type: 'spell', c: w }]);
+      api.Lrecord(w, false, 'spell');
+      api.advance();
+      api.Lrecord(w, true, 'spell');
+      const s = api.Lstate(w);
+      expect(s.cycles).toBe(0);
+      expect(s.spellingPass).toBe(true);
+      const gap = (s.due as number) - Date.now();
+      expect(gap).toBeGreaterThan(23 * HOUR);
+      expect(gap).toBeLessThan(25 * HOUR);
+    });
+
+    it('gives up after two retries and says tomorrow instead of ten minutes', () => {
+      const api = round();
+      api.start([{ type: 'recognize', c: w }]);
+      expect(api.Lrecord(w, false, 'recognize').again).toBe(true);
+      api.advance();
+      expect(api.Lrecord(w, false, 'recognize').again).toBe(true);
+      api.advance();
+      const last = api.Lrecord(w, false, 'recognize');
+      expect(last.again).toBe(false);
+      expect(last.tomorrow).toBe(true);
+      expect(api.queue()).toHaveLength(3);
+      expect((api.Lstate(w).due as number) - Date.now()).toBeGreaterThan(23 * HOUR);
+    });
+
+    it('costs a mastered word one rung of the ladder, not the whole ladder', () => {
+      const api = round({ w: { introduced: true, strength: 5, cycles: 3, spellingPass: true, known: true, due: 1 } });
+      api.start([{ type: 'spell', c: w, spot: true }]);
+      api.Lrecord(w, false, 'spell');
+      expect(api.Lmastered(api.Lstate(w))).toBe(false);
+      expect(api.queue()[1]).toMatchObject({ spot: true, retry: true });
+      api.advance();
+      api.Lrecord(w, true, 'spell');
+      const s = api.Lstate(w);
+      expect(s.cycles).toBe(2);
+      expect(api.Lmastered(s)).toBe(false);
+      const gap = (s.due as number) - Date.now();
+      expect(gap).toBeGreaterThan(2.9 * 24 * HOUR);
+      expect(gap).toBeLessThan(3.1 * 24 * HOUR);
+    });
   });
 
   it('brings a mastered word back once its interval is up, oldest first', () => {
@@ -657,5 +728,449 @@ describe('a chapter-specific sense', () => {
     const picked = Ldistractors(cards[0]);
     expect(picked.map((x) => x.de)).not.toContain('rennen');
     expect(new Set([cards[0], ...picked].map(LoptionEn)).size).toBe(4);
+  });
+});
+
+// Five thousand words in file order is not a curriculum. The daily plan handed
+// out the first unlearned words it found, so somebody halfway through A2 was fed
+// A1 Kapitel 1 every morning; and there was no way to look a word up at all.
+describe('where you are in a deck this size', () => {
+  type Row = { id: string; level: string; chapter: string; de: string; zh?: string; en?: string; grammar?: string };
+  const documentStub = { addEventListener: () => {}, getElementById: () => null };
+  type Progress = Record<string, { introduced?: boolean; known?: boolean; cycles?: number; strength?: number; spellingPass?: boolean; due?: number }>;
+  type Group = { level: string; chapter: string; cards: Row[] };
+
+  const learnAt = (cards: Row[], prefs: Record<string, unknown> = {}, progress: Progress = {}) =>
+    load<{
+      LfreshCards(n: number): Row[];
+      LchapGroups(): Group[];
+      LposGroup(): Group | null;
+      LposIndex(): number;
+      Lunlearned(c: Row): boolean;
+      Lstate(c: Row): Record<string, unknown>;
+      Lmastered(s: Record<string, unknown>): boolean;
+    }>('learn.core.js',
+      '{ LfreshCards, LchapGroups, LposGroup, LposIndex, Lunlearned, Lstate, Lmastered }',
+      {
+        DWStore: { KEYS: { LEARN: 'l' }, read: () => progress, onMigrated: () => {}, prefs: () => prefs, queue: () => {} },
+        document: documentStub,
+        CARDS: cards,
+      });
+
+  // Written so a chapter's words are findable by name: the Kapitel a word lands
+  // in is the whole point of every assertion below.
+  const word = (level: string, chapter: string, de: string): Row =>
+    ({ id: `${level}-${chapter}-${de}`, level, chapter, de, zh: de, en: de });
+  const DECK: Row[] = [
+    word('A1', '1', 'Hallo'), word('A1', '1', 'danke'),
+    word('A2', '7', 'die Rechnung'), word('A2', '7', 'aufstehen'),
+    word('A1', '2', 'das Haus'),
+    word('A2', '8', 'die Meinung'),
+    word('B1', '1', 'verschwinden'),
+  ];
+  const learnt = { introduced: true, cycles: 1, strength: 2, due: 0 };
+
+  it('orders the deck by level and Kapitel, not by where the rows happen to sit', () => {
+    // A1 Kapitel 2 is written after A2 Kapitel 7 in this file, as chapters added
+    // later always are. Reading position off file order would step over it.
+    const g = learnAt(DECK).LchapGroups();
+    expect(g.map((x) => `${x.level}K${x.chapter}`)).toEqual(['A1K1', 'A1K2', 'A2K7', 'A2K8', 'B1K1']);
+  });
+
+  it('starts the new words at the Kapitel you said you were on', () => {
+    const l = learnAt(DECK, { posLevel: 'A2', posChapter: '7' });
+    expect(l.LfreshCards(3).map((c) => c.de)).toEqual(['die Rechnung', 'aufstehen', 'die Meinung']);
+  });
+
+  it('still starts at the beginning when nobody has said where they are', () => {
+    // The position is new; every existing install has none, and must behave as
+    // it did yesterday rather than silently jumping somewhere.
+    expect(learnAt(DECK).LfreshCards(2).map((c) => c.de)).toEqual(['Hallo', 'danke']);
+  });
+
+  it('moves on by itself once the Kapitel you are on is finished', () => {
+    const done: Progress = { 'A2-7-die Rechnung': { ...learnt }, 'A2-7-aufstehen': { ...learnt } };
+    const l = learnAt(DECK, { posLevel: 'A2', posChapter: '7' }, done);
+    const g = l.LposGroup();
+    expect(`${g!.level}K${g!.chapter}`).toBe('A2K8');
+    expect(l.LfreshCards(1).map((c) => c.de)).toEqual(['die Meinung']);
+  });
+
+  it('goes back for what was stepped over, but only once nothing is left ahead', () => {
+    const ahead: Progress = {
+      'A2-7-die Rechnung': { ...learnt }, 'A2-7-aufstehen': { ...learnt },
+      'A2-8-die Meinung': { ...learnt }, 'B1-1-verschwinden': { ...learnt },
+    };
+    // A1 was skipped over when the position was set; reporting the deck finished
+    // while those words sit unlearned would be a lie.
+    expect(learnAt(DECK, { posLevel: 'A2', posChapter: '7' }, ahead).LfreshCards(5).map((c) => c.de))
+      .toEqual(['Hallo', 'danke', 'das Haus']);
+  });
+
+  it('treats a word waved through as learnt, not as new', () => {
+    const waved: Progress = { 'A2-7-die Rechnung': { introduced: true, known: true } };
+    const l = learnAt(DECK, { posLevel: 'A2', posChapter: '7' }, waved);
+    expect(l.LfreshCards(2).map((c) => c.de)).toEqual(['aufstehen', 'die Meinung']);
+    expect(l.Lmastered(l.Lstate(DECK[2]))).toBe(true);
+  });
+
+  it('reports no position rather than guessing one when the Kapitel is gone', () => {
+    // Swapping in a deck that has no A2 Kapitel 7 must not leave the plan stuck.
+    const l = learnAt(DECK, { posLevel: 'A2', posChapter: '99' });
+    expect(l.LposIndex()).toBe(-1);
+    expect(l.LfreshCards(1).map((c) => c.de)).toEqual(['Hallo']);
+  });
+});
+
+describe('finding one word among five thousand', () => {
+  type Row = { id: string; level: string; chapter: string; de: string; zh?: string; en?: string; grammar?: string };
+  const documentStub = { addEventListener: () => {}, getElementById: () => null };
+  const DECK: Row[] = [
+    { id: '1', level: 'A1', chapter: '1', de: 'die Tür', zh: '门', en: 'door' },
+    { id: '2', level: 'A1', chapter: '2', de: 'der Bruder', zh: '哥哥；弟弟', en: 'brother' },
+    { id: '3', level: 'A2', chapter: '6', de: 'die Rechnung', zh: '账单', en: 'bill, invoice', grammar: 'Plural: die Rechnungen' },
+    { id: '4', level: 'A2', chapter: '6', de: 'rechnen', zh: '计算', en: 'to calculate' },
+    { id: '5', level: 'B1', chapter: '1', de: 'die Tüte', zh: '袋子', en: 'bag' },
+  ];
+  // The same 这里：-stripping the options use, so a chapter note never decides
+  // which search result comes first.
+  const senseFree = load<(s: string) => string>('learn.core.js', 'LsenseFree',
+    { DWStore: { KEYS: { LEARN: 'l' }, read: () => ({}), onMigrated: () => {}, prefs: () => ({}), queue: () => {} }, document: documentStub });
+  const browse = load<{
+    LbrowseFind(q: string): Row[];
+    LfoldBase(s: string): string;
+    LfoldAe(s: string): string;
+  }>('browse-addon.js', '{ LbrowseFind, LfoldBase, LfoldAe }',
+    { document: documentStub, LallLearningCards: () => DECK, LsenseFree: senseFree });
+
+  it('finds a word by its German, its Chinese or its English', () => {
+    expect(browse.LbrowseFind('Rechnung').map((c) => c.id)).toEqual(['3']);
+    expect(browse.LbrowseFind('账单').map((c) => c.id)).toEqual(['3']);
+    expect(browse.LbrowseFind('invoice').map((c) => c.id)).toEqual(['3']);
+  });
+
+  it('finds an umlaut from a keyboard that has none, spelled either way', () => {
+    // Nobody types ü on a phone in a hurry. Both conventions have to land.
+    expect(browse.LbrowseFind('tur').map((c) => c.de)).toEqual(['die Tür']);
+    expect(browse.LbrowseFind('tuer').map((c) => c.de)).toEqual(['die Tür']);
+    expect(browse.LbrowseFind('Tür').map((c) => c.de)).toEqual(['die Tür']);
+  });
+
+  it('does not read an honest ue as an umlaut', () => {
+    // Folding the query instead of the deck would turn `Bruder` into `Brder`
+    // and lose it — so the deck is folded both ways and the query left alone.
+    expect(browse.LbrowseFind('bruder').map((c) => c.id)).toEqual(['2']);
+    expect(browse.LfoldBase('der Bruder')).toBe('der bruder');
+    expect(browse.LfoldAe('die Tür')).toBe('die tuer');
+  });
+
+  it('puts the word you typed above the words that merely contain it', () => {
+    expect(browse.LbrowseFind('rechnen')[0].de).toBe('rechnen');
+    expect(browse.LbrowseFind('rechn').map((c) => c.de)).toEqual(['die Rechnung', 'rechnen']);
+  });
+
+  it('ranks an exact Chinese sense above a word that merely contains it', () => {
+    // 花 is 花园's first character. Ranking German alone left 花园 on top, which
+    // is the wrong answer to a one-character query.
+    const withGarden = [...DECK, { id: '6', level: 'A1', chapter: '1', de: 'der Garten', zh: '花园', en: 'garden' },
+      { id: '7', level: 'A1', chapter: '4', de: 'die Blume', zh: '花', en: 'flower' }];
+    const b = load<{ LbrowseFind(q: string): Row[] }>('browse-addon.js', '{ LbrowseFind }',
+      { document: documentStub, LallLearningCards: () => withGarden, LsenseFree: senseFree });
+    expect(b.LbrowseFind('花').map((c) => c.de)).toEqual(['die Blume', 'der Garten']);
+  });
+
+  it('does not let a 这里： note decide the ranking', () => {
+    const sensed = [{ id: '8', level: 'A1', chapter: '1', de: 'gut', zh: '好；好的', en: 'good' },
+      { id: '9', level: 'A1', chapter: '4', de: 'gut', zh: '这里：好的；没问题', en: 'hier: okay' }];
+    const b = load<{ LbrowseFind(q: string): Row[] }>('browse-addon.js', '{ LbrowseFind }',
+      { document: documentStub, LallLearningCards: () => sensed, LsenseFree: senseFree });
+    // Both are exact hits on 好的; neither is demoted for carrying the prefix.
+    expect(b.LbrowseFind('好的').map((c) => c.id)).toEqual(['8', '9']);
+  });
+
+  it('searches the word-form column too, and says nothing when there is nothing', () => {
+    expect(browse.LbrowseFind('Rechnungen').map((c) => c.id)).toEqual(['3']);
+    expect(browse.LbrowseFind('Fahrrad')).toEqual([]);
+    expect(browse.LbrowseFind('   ')).toEqual([]);
+  });
+});
+
+// Two more columns the deck has always carried and the app has only ever
+// printed: which preposition a word governs, and what a verb does to its own
+// stem in the third person.
+describe('the two things a Chinese gloss cannot tell you', () => {
+  type Card = { id?: string; level?: string; chapter?: string; de: string; zh?: string; en?: string; grammar?: string };
+  const documentStub = { addEventListener: () => {}, getElementById: () => null };
+  const DWStoreStub = { KEYS: { LEARN: 'l' }, read: () => ({}), onMigrated: () => {}, prefs: () => ({}), queue: () => {} };
+  const learn = load<{ Lnorm(s: string): string; LsenseFree(s: string): string; Lmeaning(c: Card): string; Lenglish(c: Card): string; LhasZh(c: Card): boolean; Lshuffle<T>(a: T[]): T[] }>(
+    'learn.core.js', '{ Lnorm, LsenseFree, Lmeaning, Lenglish, LhasZh, Lshuffle }', { DWStore: DWStoreStub, document: documentStub });
+
+  type Rek = { kind: 'prep'; combos: Array<{ prep: string; kase: string }> } | { kind: 'case'; cases: string[]; isPrep: boolean } | null;
+  type Conj = { inf: string; present: string; past: string; perfect: string; aux: string; participle: string; separable: boolean; regular: boolean; multiword: boolean } | null;
+  const drillsOver = (cards: Card[]) => load<{
+    LrektionOf(c: Card): Rek;
+    LrektionHint(c: Card): string;
+    LrektionAccepted(c: Card, picked: string): boolean;
+    LrektionOptions(c: Card): string[];
+    LrektionCombos(): string[];
+    LconjOf(c: Card): Conj;
+    LconjAsk(c: Card, i: number): string;
+    LconjAccepted(c: Card, ask: string, input: string): boolean;
+  }>('drills-addon.js',
+    '{ LrektionOf, LrektionHint, LrektionAccepted, LrektionOptions, LrektionCombos, LconjOf, LconjAsk, LconjAccepted }',
+    { DWStore: DWStoreStub, document: documentStub, CARDS: cards, Lnorm: learn.Lnorm, LsenseFree: learn.LsenseFree,
+      DWInsight: load<any>('insight.js', 'DWInsight'),
+      Lenglish: learn.Lenglish, Lshuffle: learn.Lshuffle,
+      // In the app the Chinese lives in a ZH map keyed by id, filled from c.zh
+      // at boot; here it is read off the card, which is the same value.
+      Lmeaning: (c: Card) => c.zh || learn.Lenglish(c), LhasZh: (c: Card) => !!c.zh });
+
+  describe('which preposition, and which case', () => {
+    const warten: Card = { id: 'w', de: 'warten', zh: '等待（auf +A 等某人／某事）', en: 'to wait (auf +A)' };
+    const sprechen: Card = { id: 's', de: 'sprechen', zh: '说；讲（mit +D 和某人说；über +A 谈论）', en: 'to speak' };
+    const aus: Card = { id: 'a', de: 'aus', zh: '这里：来自（+三格）', en: 'hier: from (+D)' };
+    const d = drillsOver([warten, sprechen, aus]);
+
+    it('reads the preposition and the case out of the gloss', () => {
+      expect(d.LrektionOf(warten)).toEqual({ kind: 'prep', combos: [{ prep: 'auf', kase: '四格' }] });
+    });
+
+    it('keeps both prepositions when a verb governs two', () => {
+      // sprechen mit +D and sprechen über +A are both right, so neither may be
+      // offered as the other's wrong answer.
+      const r = d.LrektionOf(sprechen)!;
+      expect(r.kind).toBe('prep');
+      expect((r as { combos: Array<{ prep: string }> }).combos.map((x) => x.prep)).toEqual(['mit', 'über']);
+      expect(d.LrektionAccepted(sprechen, 'mit + 三格')).toBe(true);
+      expect(d.LrektionAccepted(sprechen, 'über + 四格')).toBe(true);
+      expect(d.LrektionAccepted(sprechen, 'auf + 四格')).toBe(false);
+      expect(d.LrektionOptions(sprechen)).not.toContain('über + 四格');
+    });
+
+    it('asks a preposition about its own case instead of about itself', () => {
+      expect(d.LrektionOf(aus)).toEqual({ kind: 'case', cases: ['三格'], isPrep: true });
+      expect(d.LrektionOptions(aus)).toEqual(['三格', '四格', '二格']);
+      expect(d.LrektionAccepted(aus, '三格')).toBe(true);
+      expect(d.LrektionAccepted(aus, '四格')).toBe(false);
+    });
+
+    it('takes the answer back out of the hint', () => {
+      // The gloss writes the answer in brackets. Printing it under the question
+      // is the same tell the multiple-choice options used to have.
+      expect(d.LrektionHint(warten)).toBe('等待');
+      expect(d.LrektionHint(sprechen)).toBe('说；讲');
+      expect(d.LrektionHint(aus)).toBe('来自');
+      for (const c of [warten, sprechen, aus]) expect(d.LrektionHint(c)).not.toMatch(/\+\s*(A|D|G|三格|四格|二格)/);
+    });
+
+    it('says nothing rather than guessing at a case marker loose in prose', () => {
+      // The deck writes a Rektion note as its own bracket. A `+A` in the middle
+      // of running text is not one, and neither is a noun a preposition.
+      const noise: Card = { id: 'n', de: 'das Haus', zh: '房子（很大 +A 的那种）', en: 'house' };
+      expect(drillsOver([noise]).LrektionOf(noise)).toBe(null);
+    });
+
+    it('asks a dative verb about its case without calling it a preposition', () => {
+      // helfen takes the dative with no preposition at all — Ich helfe dir,
+      // never dich. Same three answers, different question.
+      const helfen: Card = { id: 'h', de: 'helfen', zh: '帮助（+D 帮某人）', en: 'to help (+D)' };
+      const r = drillsOver([helfen]).LrektionOf(helfen)!;
+      expect(r).toEqual({ kind: 'case', cases: ['三格'], isPrep: false });
+      const ausR = drillsOver([aus]).LrektionOf(aus)!;
+      expect(ausR.kind === 'case' && ausR.isPrep).toBe(true);
+    });
+  });
+
+  describe('what a verb does to its own stem', () => {
+    const nehmen: Card = { id: 'n', de: 'nehmen', zh: '拿；取', grammar: 'er nimmt, hat genommen' };
+    const aufstehen: Card = { id: 'a', de: 'aufstehen', zh: '起床', grammar: 'er steht auf, ist aufgestanden' };
+    const kochen: Card = { id: 'k', de: 'kochen', zh: '做饭', grammar: 'er kocht, hat gekocht' };
+    const sprechen: Card = { id: 's', de: 'sprechen', zh: '说', grammar: 'er spricht, sprach, hat gesprochen' };
+    const d = drillsOver([nehmen, aufstehen, kochen, sprechen]);
+
+    it('marks the stem change that nobody warns you about', () => {
+      // One reading of the column serves the drills and the explanations alike,
+      // so the auxiliary and the participle come out of the same call.
+      expect(d.LconjOf(nehmen)).toEqual({
+        inf: 'nehmen', present: 'nimmt', past: '', perfect: 'hat genommen',
+        aux: 'haben', participle: 'genommen', separable: false, regular: false, multiword: false,
+      });
+      expect(d.LconjOf(kochen)!.regular).toBe(true);
+    });
+
+    it('knows a separable prefix goes to the end', () => {
+      const k = d.LconjOf(aufstehen)!;
+      expect(k.present).toBe('steht auf');
+      expect(k.separable).toBe(true);
+      expect(d.LconjAccepted(aufstehen, 'present', 'er steht auf')).toBe(true);
+      expect(d.LconjAccepted(aufstehen, 'present', 'steht auf')).toBe(true);
+      expect(d.LconjAccepted(aufstehen, 'present', 'aufsteht')).toBe(false);
+    });
+
+    it('scores er nimmt right and er nehmt wrong', () => {
+      expect(d.LconjAccepted(nehmen, 'present', 'er nimmt')).toBe(true);
+      expect(d.LconjAccepted(nehmen, 'present', 'nimmt')).toBe(true);
+      expect(d.LconjAccepted(nehmen, 'present', 'nehmt')).toBe(false);
+    });
+
+    it('reaches the Präteritum the B1 entries carry, and only those', () => {
+      expect(d.LconjOf(sprechen)!.past).toBe('sprach');
+      // Alternating by position keeps a round predictable; a two-form entry has
+      // no Präteritum to ask for, so it never gets that question.
+      expect(d.LconjAsk(sprechen, 1)).toBe('past');
+      expect(d.LconjAsk(sprechen, 0)).toBe('present');
+      expect(d.LconjAsk(nehmen, 1)).toBe('present');
+      expect(d.LconjAccepted(sprechen, 'past', 'sprach')).toBe(true);
+      expect(d.LconjAccepted(sprechen, 'past', 'spricht')).toBe(false);
+    });
+
+    it('refuses a multi-word entry rather than asking a question about half of it', () => {
+      const spazieren: Card = { id: 'z', de: 'spazieren gehen', zh: '散步', grammar: 'er geht spazieren, ist spazieren gegangen' };
+      const plural: Card = { id: 'p', de: 'die Frage', zh: '问题', grammar: 'Plural: die Fragen' };
+      const dd = drillsOver([spazieren, plural]);
+      expect(dd.LconjOf(spazieren)).toBe(null);
+      expect(dd.LconjOf(plural)).toBe(null);
+    });
+  });
+});
+
+// bleiben–blieb–geblieben and schreiben–schrieb–geschrieben are one pattern, not
+// two facts. The class comes off the three forms the deck already carries, so it
+// costs nothing per word — but a pattern read wrongly is worse than none.
+describe('why a verb changes the way it does', () => {
+  const DWInsight = load<any>('insight.js', 'DWInsight');
+  type Card = { de: string; zh?: string; en?: string; grammar?: string; level?: string; chapter?: string };
+  const verb = (de: string, grammar: string, zh = de, level = 'A1', chapter = '1'): Card =>
+    ({ de, zh, en: de, grammar, level, chapter });
+  const STRONG: Card[] = [
+    verb('bleiben', 'er bleibt, blieb, ist geblieben'),
+    verb('schreiben', 'er schreibt, schrieb, hat geschrieben'),
+    verb('scheinen', 'er scheint, schien, hat geschienen'),
+    verb('beschreiben', 'er beschreibt, beschrieb, hat beschrieben'),
+    verb('nehmen', 'er nimmt, nahm, hat genommen'),
+    verb('sprechen', 'er spricht, sprach, hat gesprochen'),
+    verb('treffen', 'er trifft, traf, hat getroffen'),
+    verb('gehen', 'er geht, ging, ist gegangen'),
+    verb('kaufen', 'er kauft, hat gekauft'),
+  ];
+
+  it('reads the class off the three forms, prefix and all', () => {
+    // verschreiben's first vowel is the e of ver-; the stem vowel is what the
+    // class is about.
+    expect(DWInsight.LablautClass(STRONG[0])).toBe('ei–ie–ie');
+    expect(DWInsight.LablautClass(STRONG[3])).toBe('ei–ie–ie');
+    expect(DWInsight.LablautClass(STRONG[4])).toBe('e–a–o');
+    expect(DWInsight.LablautClass(STRONG[7])).toBe('e–i–a');
+  });
+
+  it('shows the other verbs that change the same way', () => {
+    const ab = DWInsight.Lablaut(STRONG[0], STRONG);
+    expect(ab.label).toBe('ei → ie → ie');
+    expect(ab.family).toEqual(['schreiben', 'scheinen', 'beschreiben']);
+  });
+
+  it('says nothing about a verb with no Präteritum to compare', () => {
+    // A1 and A2 entries carry two forms, not three. There is no class to read.
+    expect(DWInsight.LablautClass(STRONG[8])).toBe(null);
+    expect(DWInsight.Lablaut(STRONG[8], STRONG)).toBe(null);
+  });
+
+  it('refuses a triple that is not a class German has', () => {
+    // Which is also what catches a stem vowel read wrongly: an invented class
+    // would otherwise look exactly like a real finding.
+    expect(DWInsight.LablautClass(verb('quaxen', 'er quaxt, quox, hat gequuxen'))).toBe(null);
+  });
+
+  it('needs a family before it calls something a pattern', () => {
+    const lonely = [verb('nehmen', 'er nimmt, nahm, hat genommen'), verb('kaufen', 'er kauft, hat gekauft')];
+    expect(DWInsight.Lablaut(lonely[0], lonely)).toBe(null);
+  });
+
+  describe('haben or sein', () => {
+    // "sein means motion" explains 89% of this deck's ist-verbs and misfires on
+    // eight hat-verbs, which is below the bar for stating a rule. Nothing here
+    // predicts the auxiliary: it names the group only once the card has said ist.
+    const MOVERS: Card[] = [
+      verb('gehen', 'er geht, ging, ist gegangen'),
+      verb('kommen', 'er kommt, kam, ist gekommen'),
+      verb('fahren', 'er fährt, fuhr, ist gefahren'),
+      verb('anziehen', 'er zieht an, zog an, hat angezogen'),
+    ];
+
+    it('explains the sein a card has already declared', () => {
+      const se = DWInsight.Lsein(MOVERS[0], MOVERS);
+      expect(se.participle).toBe('gegangen');
+      expect(se.family).toEqual(['kommen → ist gekommen', 'fahren → ist gefahren']);
+    });
+
+    it('stays silent on a haben verb, however much it looks like motion', () => {
+      // anziehen is the ziehen family splitting: transitive takes haben.
+      expect(DWInsight.Lsein(MOVERS[3], MOVERS)).toBe(null);
+      expect(DWInsight.Lanalyse(MOVERS[3], MOVERS).some((r: any) => r.kind === 'aux')).toBe(false);
+    });
+  });
+
+  describe('one word, two entries', () => {
+    const SPLIT: Card[] = [
+      { de: 'der Rock', zh: '裙子', level: 'A1', chapter: '3' },
+      { de: 'der Rock', zh: '摇滚乐', level: 'A2', chapter: '12' },
+      { de: 'der Gefallen', zh: '人情；帮忙', level: 'B1', chapter: '2' },
+      { de: 'das Gefallen', zh: '喜爱', level: 'B1', chapter: '7' },
+      { de: 'gut', zh: '这里：好的；没问题', level: 'A1', chapter: '4' },
+      { de: 'gut', zh: '好；好地', level: 'A1', chapter: '1' },
+    ];
+
+    it('points at the other sense instead of leaving two right answers around', () => {
+      const s = DWInsight.Lsenses(SPLIT[0], SPLIT);
+      expect(s).toEqual([{ art: 'der', sense: '摇滚乐', where: 'A2 K12', gendered: false }]);
+    });
+
+    it('calls out the pair that differs only by its article', () => {
+      const s = DWInsight.Lsenses(SPLIT[2], SPLIT);
+      expect(s[0].gendered).toBe(true);
+      const row = DWInsight.Lanalyse(SPLIT[2], SPLIT).find((r: any) => r.kind === 'senses');
+      expect(row.label).toBe('换个性别就换个意思');
+      expect(row.text).toContain('das Gefallen = 喜爱');
+    });
+
+    it('strips the 这里： note before comparing, and before showing', () => {
+      const s = DWInsight.Lsenses(SPLIT[5], SPLIT);
+      expect(s).toEqual([{ art: '', sense: '好的；没问题', where: 'A1 K4', gendered: false }]);
+    });
+
+    it('says nothing when the same word is listed twice with the same meaning', () => {
+      const same = [{ de: 'die Tür', zh: '门', level: 'A1', chapter: '1' }, { de: 'die Tür', zh: '门', level: 'A2', chapter: '3' }];
+      expect(DWInsight.Lsenses(same[0], same)).toEqual([]);
+    });
+  });
+});
+
+// The deck the app ships is every first visitor's first impression. Four of the
+// seven drills were empty on it; this pins that they never go empty again.
+describe('the starter deck shows every drill working', () => {
+  const documentStub = { addEventListener: () => {}, getElementById: () => null };
+  const DWStoreStub = { KEYS: { LEARN: 'l' }, read: () => ({}), onMigrated: () => {}, prefs: () => ({}), queue: () => {} };
+  const raw = JSON.parse(readFileSync(new URL('../src/starter-deck.json', import.meta.url), 'utf8'));
+  const cards: Array<Record<string, string>> = (raw.cards as Array<Record<string, string>>).map((c, i) => ({ ...c, id: `s${i}`, chapter: String(c.chapter) }));
+  const src = ['insight.js', 'learn.core.js', 'drills-addon.js']
+    .map((f) => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8')).join('\n');
+  const api = new Function('DWStore', 'document', 'window', 'CARDS',
+    `${src}\nZH=Object.fromEntries(CARDS.filter(c=>c.zh).map(c=>[c.id,c.zh]));\nreturn { LdrillPoolFor, DWInsight };`)(
+    DWStoreStub, documentStub, {}, cards) as { LdrillPoolFor(kind: string): unknown[]; DWInsight: any };
+
+  it.each(['gender', 'plural', 'conj', 'aux', 'rektion', 'cloze', 'dictation'])('has at least eight %s questions', (kind) => {
+    expect(api.LdrillPoolFor(kind).length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('carries examples in the format the app itself defines, with the Chinese half', () => {
+    const withExample = cards.filter((c) => c.example);
+    expect(withExample.length).toBeGreaterThanOrEqual(60);
+    for (const c of withExample) expect(c.example, c.de).toMatch(/^[^（）]+（[^（）]+）$/);
+  });
+
+  it('lets the insight panel explain sein for the verbs that take it', () => {
+    let sein = 0;
+    for (const c of cards) for (const r of api.DWInsight.Lanalyse(c, cards)) if (r.kind === 'aux') sein++;
+    expect(sein).toBeGreaterThanOrEqual(5);
   });
 });

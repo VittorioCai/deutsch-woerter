@@ -151,6 +151,168 @@ const DWInsight = (() => {
     return null;
   }
 
+  // ---- verb forms ------------------------------------------------------------
+  // One reading of the word-form column, for everything that needs it. The
+  // drills parsed it separately before; two copies of a format is how the
+  // spelling rule drifted apart from the wrong-book.
+  //   A1/A2:  er geht, ist gegangen
+  //   B1:     er verschwindet, verschwand, ist verschwunden
+  function Lforms(card) {
+    const g = String((card && card.grammar) || "").trim();
+    if (!/^er\s/i.test(g)) return null;
+    const parts = g.split(/\s*,\s*/).map((x) => x.trim()).filter(Boolean);
+    if (parts.length < 2 || parts.length > 3) return null;
+    const present = parts[0].replace(/^er\s+/i, "").trim();
+    const perfect = parts[parts.length - 1];
+    const m = perfect.match(/^(hat|ist)\s+(\S.*)$/);
+    if (!present) return null;
+    const inf = String(card.de || "").trim();
+    const stem = inf.replace(/e?n$/, "");
+    return {
+      inf, present,
+      past: parts.length === 3 ? parts[1] : "",
+      perfect,
+      aux: m ? (m[1] === "hat" ? "haben" : "sein") : "",
+      participle: m ? m[2].trim() : "",
+      separable: /\s/.test(present),
+      regular: present === `${stem}t` || present === `${stem}et`,
+      multiword: /[\s|/]/.test(inf),
+    };
+  }
+
+  // ---- ablaut ----------------------------------------------------------------
+  // bleiben–blieb–geblieben and schreiben–schrieb–geschrieben are one pattern,
+  // not two facts. The class is read off the three forms the deck already
+  // carries, so it costs nothing per word and works on any deck.
+  //
+  // Reading a stem vowel means getting past the prefix — verschwinden's first
+  // vowel is the e of ver-. Stripping is bounded: a class is only named when the
+  // triple is one of the real ones AND the loaded deck has enough verbs in it,
+  // so a slip in the stripping cannot invent a pattern.
+  const VPREF = ["zurück", "zusammen", "gegenüber", "herunter", "hinunter", "wieder", "wider", "durch",
+    "unter", "über", "hinter", "heraus", "herein", "hervor", "hinaus", "hinein", "entlang", "vorbei",
+    "weiter", "davon", "dabei", "empor", "statt", "miss", "auf", "aus", "ein", "vor", "ent", "emp",
+    "ver", "zer", "nach", "mit", "ab", "an", "be", "er", "ge", "um", "zu", "her", "hin"];
+  const NUCLEUS = /(ie|ei|au|äu|eu|[aeiouäöüy])/;
+  function Lnucleus(form, last) {
+    if (!form) return null;
+    const toks = String(form).trim().split(/\s+/);
+    let w = (last ? toks[toks.length - 1] : toks[0]).toLowerCase();
+    for (let go = true; go;) {
+      go = false;
+      for (const p of VPREF) {
+        if (w.length - p.length >= 3 && w.startsWith(p)) { w = w.slice(p.length); go = true; break }
+      }
+    }
+    const m = NUCLEUS.exec(w);
+    return m ? m[1] : null;
+  }
+  // The classes German actually has. Everything else the reader produces is a
+  // parse that went wrong, and says nothing.
+  const ABLAUT = {
+    "ei–ie–ie": "ei → ie → ie", "ei–i–i": "ei → i → i", "ie–o–o": "ie → o → o",
+    "i–a–u": "i → a → u", "i–a–o": "i → a → o", "e–a–o": "e → a → o", "e–a–e": "e → a → e",
+    "a–u–a": "a → u → a", "a–ie–a": "a → ie → a", "au–ie–au": "au → ie → au",
+    "e–i–a": "e → i → a", "o–a–o": "o → a → o", "e–a–a": "e → a → a",
+    "ie–a–e": "ie → a → e", "i–a–e": "i → a → e", "ü–o–o": "ü → o → o", "e–o–o": "e → o → o",
+  };
+  const ABLAUT_MIN = 3;
+  function LablautOf(f) {
+    if (!f || !f.past || f.multiword) return null;
+    const a = Lnucleus(f.inf), b = Lnucleus(f.past), c = Lnucleus(f.participle, true);
+    if (!a || !b || !c) return null;
+    const key = `${a}–${b}–${c}`;
+    return ABLAUT[key] ? key : null;
+  }
+  const LablautClass = (card) => LablautOf(Lforms(card));
+
+  // Built once per deck, the way the compound index already is: an explanation
+  // that walks five thousand cards every time a card is drawn costs more than it
+  // explains.
+  let VERBS = null, VERBED = null;
+  function LverbIndex(cards) {
+    if (VERBED === cards && VERBS) return VERBS;
+    const byClass = new Map(), sein = [], byWord = new Map();
+    for (const c of cards) {
+      const f = Lforms(c);
+      if (f) {
+        const k = LablautOf(f);
+        if (k) { if (!byClass.has(k)) byClass.set(k, []); byClass.get(k).push(c) }
+        if (f.aux === "sein" && !f.multiword) sein.push(c);
+      }
+      const bare = stemOf(c.de).toLowerCase();
+      if (!bare || /[\s|/]/.test(bare)) continue;
+      if (!byWord.has(bare)) byWord.set(bare, []);
+      byWord.get(bare).push(c);
+    }
+    VERBS = { byClass, sein, byWord };
+    VERBED = cards;
+    return VERBS;
+  }
+
+  function Lablaut(card, cards) {
+    const key = LablautClass(card);
+    if (!key) return null;
+    const all = LverbIndex(cards || []).byClass.get(key) || [];
+    const self = String(card.de || "").trim().toLowerCase(), seen = new Set([self]), fam = [];
+    let members = 1;
+    for (const c of all) {
+      const k = String(c.de || "").trim().toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      members++;
+      if (fam.length < 3) fam.push(String(c.de).trim());
+    }
+    if (members < ABLAUT_MIN) return null;
+    return { key, label: ABLAUT[key], family: fam };
+  }
+
+  // ---- haben or sein ---------------------------------------------------------
+  // "sein means motion or a change of state" explains 89% of this deck's `ist`
+  // verbs and misfires on eight `hat` ones — the ziehen family splits, because
+  // transitive anziehen takes haben while intransitive umziehen takes sein. That
+  // is below the bar for stating a rule. But nothing here has to PREDICT the
+  // auxiliary: the card already says which one it is. Naming the group a verb
+  // belongs to, only once the card has said `ist`, cannot contradict the card.
+  function Lsein(card, cards) {
+    const f = Lforms(card);
+    if (!f || f.aux !== "sein" || f.multiword) return null;
+    const self = String(card.de || "").trim().toLowerCase(), seen = new Set([self]), fam = [];
+    for (const c of LverbIndex(cards || []).sein) {
+      const k = String(c.de || "").trim().toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      fam.push(`${String(c.de).trim()} → ist ${Lforms(c).participle}`);
+      if (fam.length >= 4) break;
+    }
+    return fam.length >= 2 ? { participle: f.participle, family: fam } : null;
+  }
+
+  // ---- one word, two entries -------------------------------------------------
+  // 207 headwords in this deck appear on more than one card, because German
+  // reuses a word across senses and sometimes across genders — der Rock is a
+  // skirt, and rock music. Those siblings are also the ones the multiple-choice
+  // options had to stop offering as wrong answers; this is the other half of
+  // that, showing the sense instead of hiding it.
+  const senseOf = (c) => String(c.zh || c.en || "")
+    .replace(/(?:这里|此处)\s*[：:]\s*/g, "").replace(/\bhier\s*:\s*/gi, "").trim();
+  function Lsenses(card, cards, max = 3) {
+    const bare = stemOf(card.de).toLowerCase();
+    if (!bare || /[\s|/]/.test(bare)) return [];
+    const mine = senseOf(card), out = [], seen = new Set([mine]);
+    for (const c of LverbIndex(cards || []).byWord.get(bare) || []) {
+      // Compared by id only when there is one: a deck handed in without ids
+      // would otherwise have every card skip itself and everything else too.
+      if (c === card || (card.id && c.id === card.id)) continue;
+      const s = senseOf(c);
+      if (!s || seen.has(s)) continue;
+      seen.add(s);
+      out.push({ art: artOf(c.de), sense: s, where: `${c.level} K${c.chapter}`, gendered: !!artOf(c.de) && artOf(c.de) !== artOf(card.de) });
+      if (out.length >= max) break;
+    }
+    return out;
+  }
+
   // ---- same-ending family ----------------------------------------------------
   // Seeing four more -ung words next to the rule is what turns the rule from a
   // claim into a pattern.
@@ -198,6 +360,26 @@ const DWInsight = (() => {
       if (gen.plural) out.push({ kind: "plural", label: "复数规律", text: `-${gen.suf} → ${gen.plural}` });
     }
 
+    // A verb's three forms are one pattern, not three facts to memorise apart.
+    const ab = Lablaut(card, cards || []);
+    if (ab) {
+      out.push({ kind: "ablaut", label: "变化类型", text: `${ab.label}（强变化）`,
+        note: ab.family.length ? `同一类还有：${ab.family.join("、")}` : "" });
+    }
+    // Only ever said about a card that has already said `ist` itself.
+    const se = Lsein(card, cards || []);
+    if (se) {
+      out.push({ kind: "aux", label: "完成时用 sein", text: `ist ${se.participle} —— 这一类多是位移或状态变化`,
+        note: `同样用 sein 的：${se.family.join("；")}` });
+    }
+    // The same headword on another card is another sense, not a synonym.
+    const sn = Lsenses(card, cards || []);
+    if (sn.length) {
+      out.push({ kind: "senses", label: sn.some((x) => x.gendered) ? "换个性别就换个意思" : "同一个词的别的意思",
+        text: sn.map((x) => `${x.art ? `${x.art} ` : ""}${stemOf(card.de)} = ${x.sense}（${x.where}）`).join("　·　"),
+        note: sn.some((x) => x.gendered) ? "冠词不同，意思就不同——这类词只能连冠词一起记。" : "" });
+    }
+
     const af = Laffix(card);
     if (af && af.kind === "sep") {
       out.push({ kind: "affix", label: "可分动词", text: `${af.prefix}- + ${af.rest} —— ${af.prefix}- 表「${af.mean}」`,
@@ -211,7 +393,10 @@ const DWInsight = (() => {
     return out;
   }
 
-  return { Lanalyse, Lgender, Lcompound, Laffix, Lfamily, stemOf, artOf };
+  // Cards are edited in place now, so the memoised indexes have to be droppable.
+  function Lforget() { INDEX = INDEXED = VERBS = VERBED = null }
+
+  return { Lanalyse, Lgender, Lcompound, Laffix, Lfamily, Lforms, Lablaut, LablautClass, Lsein, Lsenses, Lforget, stemOf, artOf };
 })();
 
 window.DWInsight = DWInsight;
