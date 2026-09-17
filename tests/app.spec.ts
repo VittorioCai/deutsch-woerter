@@ -451,7 +451,7 @@ test('plural drill accepts every attested plural of the same noun', async ({ pag
   await page.locator('#drillStart').click();
   await expect(page.locator('#drillAnswer')).toBeVisible();
   // the German character bar must be reachable from the plural input
-  await expect(page.locator('.charBar[data-target="drillAnswer"] .charKey')).toHaveCount(7);
+  await expect(page.locator('.charBar[data-target="drillAnswer"] .charKey')).toHaveCount(4);
   await page.locator('.charBar[data-target="drillAnswer"] .charKey', { hasText: 'ä' }).first().click();
   await expect(page.locator('#drillAnswer')).toHaveValue('ä');
   await page.locator('#drillShow').click();
@@ -961,7 +961,7 @@ test('round size offers larger sets and remembers the choice', async ({ page }) 
   await page.selectOption('#learnCount', '20');
   await page.locator('#learnStartBtn').click();
   const total = Number((await page.locator('#learnBadge').textContent())!.match(/\/(\d+)/)![1]);
-  expect(total).toBe(20 * 4); // intro + three stages per word
+  expect(total).toBe(20); // the badge counts words while they are being introduced
 });
 
 test('Android is told to install the German voice data, not just switch browser', async ({ page }) => {
@@ -2163,4 +2163,49 @@ test('the next card slides in, unless the phone asks for no motion', async ({ pa
   expect(await animation()).toBe('cardIn');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   expect(await animation()).toBe('none');
+});
+
+// A round is ten words, not forty steps. The badge counts words while they are
+// introduced and questions afterwards, the feedback says when the word comes
+// back and folds the details away, and the end of the round is the day's
+// account with tomorrow in it.
+test('a round is counted in words, and ends with the day’s tally', async ({ page }) => {
+  await open(page);
+  await expect(page.locator('#homeTotal')).toHaveText(String((await deck(page)).length));
+  await expect(page.locator('#homeFresh')).not.toHaveText('0');
+  await page.locator('#goLearn').click();
+  await page.selectOption('#learnLevel', 'A1');
+  await page.selectOption('#learnChapter', '1');
+  // before a round, the chapter's own words instead of a lecture
+  await expect(page.locator('#learnBody .landRow').first()).toBeVisible();
+  await expect(page.locator('#learnBody .landTag').first()).toHaveText('还没学');
+  await openSettings(page);
+  await page.selectOption('#learnCount', '5');
+  await page.locator('#learnStartBtn').click();
+  await expect(page.locator('#learnBadge')).toHaveText(/认识新词 · 1\/5$/);
+  for (let i = 0; i < 5; i++) await page.locator('#learnRemember').click();
+  await expect(page.locator('#learnBadge')).toHaveText(/ · 1\/15$/);
+
+  let checkedFeedback = false;
+  for (let i = 0; i < 120; i++) {
+    const badge = (await page.locator('#learnBadge').textContent()) || '';
+    if (/本轮完成/.test(badge)) break;
+    if (await page.locator('#learnRemember').count()) { await page.locator('#learnRemember').click(); continue }
+    if (await page.locator('#learnBody .choice').count()) await page.locator('#learnBody .choice').first().click();
+    else { await page.locator('#learnAnswer').fill('zzz'); await page.locator('#learnSubmit').click() }
+    if (!checkedFeedback) {
+      // the question dims, the details fold away, and open on their own only after a miss
+      await expect(page.locator('#learnBody')).toHaveClass(/answered/);
+      const ok = (await page.locator('#learnFeedback.ok').count()) > 0;
+      await expect(page.locator('#learnFeedback details')).toHaveJSProperty('open', !ok);
+      await expect(page.locator('#learnFeedback .nextLine')).not.toBeEmpty();
+      checkedFeedback = true;
+    }
+    await page.locator('#learnNextBtn').click();
+  }
+  await expect(page.locator('#learnBadge')).toContainText('本轮完成');
+  await expect(page.locator('#learnBody')).toContainText('新词 5');
+  await expect(page.locator('#learnBody')).toContainText('明天有');
+  await page.locator('#learnDoneHome').click();
+  await expect(page.locator('#homeView')).toBeVisible();
 });
