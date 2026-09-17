@@ -20,7 +20,7 @@ function LeditStyles() {
   if (document.getElementById("editStyles")) return;
   const st = document.createElement("style");
   st.id = "editStyles";
-  st.textContent = `.editOverlay{position:fixed;inset:0;z-index:9999;background:rgba(18,25,38,.58);display:flex;align-items:flex-end;justify-content:center}.editOverlay.hidden{display:none}.editSheet{background:#fff;width:min(620px,100%);max-height:92vh;border-radius:22px 22px 0 0;padding:18px;overflow:auto;box-shadow:0 -16px 50px rgba(0,0,0,.18)}.editHead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}.editHead h2{margin:0;font-size:23px}.editWord{font-size:26px;font-weight:800}.editLocked{font-size:12px;color:var(--muted);line-height:1.6;background:#f5f7fb;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:12px}.editField{margin-bottom:12px}.editField label{font-size:13px;color:var(--muted);margin-bottom:5px;display:block}.editField textarea{width:100%;border:1px solid #cfd5e2;border-radius:12px;padding:11px;font-size:15px;font-family:inherit;line-height:1.55;resize:vertical;min-height:52px}.editField .small{margin-top:5px}.editChanged{color:var(--accent);font-weight:700}.editBtn{padding:4px 10px;font-size:12px;white-space:nowrap}@media(min-width:700px){.editOverlay{align-items:center;padding:18px}.editSheet{border-radius:22px;max-height:88vh}}`;
+  st.textContent = `.editOverlay{position:fixed;inset:0;z-index:9999;background:rgba(18,25,38,.58);display:flex;align-items:flex-end;justify-content:center}.editOverlay.hidden{display:none}.editSheet{background:#fff;width:min(620px,100%);max-height:92vh;border-radius:22px 22px 0 0;padding:18px;overflow:auto;box-shadow:0 -16px 50px rgba(0,0,0,.18)}.editHead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}.editHead h2{margin:0;font-size:23px}.editWord{font-size:26px;font-weight:800}.editLocked{font-size:12px;color:var(--muted);line-height:1.6;background:#f5f7fb;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:12px}.editField{margin-bottom:12px}.editField label{font-size:13px;color:var(--muted);margin-bottom:5px;display:block}.editField textarea{width:100%;border:1px solid #cfd5e2;border-radius:12px;padding:11px;font-size:15px;font-family:inherit;line-height:1.55;resize:vertical;min-height:52px}.editField .small{margin-top:5px}.editChanged{color:var(--accent);font-weight:700}.editBtn{white-space:nowrap}@media(min-width:700px){.editOverlay{align-items:center;padding:18px}.editSheet{border-radius:22px;max-height:88vh}}`;
   document.head.appendChild(st);
 }
 function LbuildEditUI() {
@@ -35,7 +35,7 @@ function LbuildEditUI() {
   ov.addEventListener("click", (e) => { if (e.target === ov) LcloseEdit() });
 }
 function LcloseEdit() { L$("editOverlay").classList.add("hidden") }
-function LeditBtn(id) { return `<button type="button" class="secondary editBtn" data-edit="${Lesc(id)}">✏️ 改</button>` }
+function LeditBtn(id) { return `<button type="button" class="linkBtn editBtn" data-edit="${Lesc(id)}">改词条</button>` }
 document.addEventListener("click", (e) => {
   const b = e.target.closest && e.target.closest("[data-edit]");
   if (!b) return;

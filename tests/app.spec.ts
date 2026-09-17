@@ -733,7 +733,7 @@ test('spelling can be switched off without stalling review pacing', async ({ pag
   expect(stages.filter((s) => /认识新词/.test(s)).length).toBe(5);
   // guard against the assertion above going vacuous again: the same walk with
   // spelling on must find the stage
-  expect(stages.some((s) => /看意思认出德语|第 2 层/.test(s))).toBe(true);
+  expect(stages.some((s) => /看意思选德语/.test(s))).toBe(true);
 
   // Linterval keys off cycles, which only advanced on a correct spelling. If the
   // round never closed, every word would sit on the 10-minute step and come back
@@ -787,7 +787,7 @@ test('the spelling toggle reaches review and the daily session too', async ({ pa
     await page.reload();
     await ready(page);
   };
-  // The badge is "第 3 层 · 主动拼写 · 5/24"; match the whole string, not a field.
+  // The badge is "主动拼写 · 5/24"; match the whole string, not a field.
   const walk = async () => {
     let total = 0, spell = 0;
     for (let i = 0; i < 80; i++) {
@@ -2041,4 +2041,33 @@ test('on a phone the card is on the first screen and the entrances are on the ho
   await page.locator('#learnSettingsBtn').click();
   expect(await page.locator('#learnSettings').evaluate((d) => (d as HTMLDetailsElement).open)).toBe(true);
   await expect(page.locator('#learnCount')).toBeVisible();
+});
+
+// One thing to press. The introduction card used to end in four equal buttons,
+// so the one pressed forty times a day (记住了) and the one that retires a word
+// from review for good (这个我已经会) looked like the same kind of choice.
+test('the introduction card has one button, and the rest is small print', async ({ page }) => {
+  await open(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#learnStartBtn').click();
+  await expect(page.locator('#learnBody .learnWord')).toBeVisible();
+  const word = ((await page.locator('#learnBody .learnWord').textContent()) || '').trim();
+  // the speaker sits beside the word instead of being a button of its own
+  await expect(page.locator('#learnBody .wordRow .speakBtn')).toHaveAttribute('data-say', word);
+  await expect(page.locator('#learnBody .learnActions button')).toHaveCount(1);
+  await expect(page.locator('#learnRemember')).toHaveClass(/primary/);
+  await expect(page.locator('#learnHard')).toHaveCount(0);
+  await expect(page.locator('#learnBody .phaseTitle')).toHaveCount(0);
+  await expect(page.locator('#learnBody .sourceNote')).toHaveCount(0);
+  // 这个我已经会 and 改词条 are lines of text: smaller than the button, still working
+  const link = page.locator('#learnKnown');
+  await expect(link).toHaveClass(/linkBtn/);
+  const [linkPx, buttonPx] = await Promise.all([
+    link.evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
+    page.locator('#learnRemember').evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
+  ]);
+  expect(linkPx).toBeLessThan(buttonPx);
+  await expect(page.locator('#learnBody .cardLinks [data-edit]')).toHaveCount(1);
+  await link.click();
+  await expect(page.locator('#lMastered')).toHaveText('1');
 });

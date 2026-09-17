@@ -544,17 +544,6 @@ describe('when a word comes back', () => {
     expect(at(12)).toBe(90 * DAY);
   });
 
-  it('brings a word flagged 很难记 back in half the time', () => {
-    const { Linterval } = srs();
-    // the flag was written on every card and read by nothing
-    expect(Linterval({ cycles: 2, hard: 1, spellingPass: false })).toBe(1.5 * DAY);
-    expect(Linterval({ cycles: 3, hard: 2, spellingPass: false })).toBe(7 * DAY);
-    // and it stops shortening once the word has been written from memory
-    expect(Linterval({ cycles: 2, hard: 1, spellingPass: true })).toBe(3 * DAY);
-    // never below the within-session floor
-    expect(Linterval({ cycles: 0, hard: 3, spellingPass: false })).toBe(10 * 60 * 1000);
-  });
-
   it('brings a mastered word back once its interval is up, oldest first', () => {
     const now = Date.now();
     const { LspotCards, LdueCards } = srs(
