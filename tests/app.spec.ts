@@ -1536,7 +1536,7 @@ test('the backup panel says how much is only in this browser, not how many days'
   await page.locator('#backupExport').click();
   await download;
   // Having exported, the panel counts from here: not "0 days" but "nothing new".
-  await expect(page.locator('.backupRisk')).toContainText('上次备份就在今天，之后你又学了 0 个词');
+  await expect(page.locator('.backupRisk')).toContainText('上次备份就在今天，之后没有新的记录');
 });
 
 test('a reminder arrives for work done, not only for days elapsed', async ({ page }) => {
@@ -1546,7 +1546,7 @@ test('a reminder arrives for work done, not only for days elapsed', async ({ pag
   await seedProgress(page, 30, { backedUpAt: Date.now() - 3600_000, work: 0 });
   await page.reload();
   await ready(page);
-  await expect(page.locator('.dwNoticeItem.warn')).toContainText('之后你又学了');
+  await expect(page.locator('.dwNoticeItem.warn')).toContainText('之后你又学了 30 个新词');
   await expect(page.locator('.dwNoticeItem.warn')).toContainText('0 天');
 });
 

@@ -30,6 +30,15 @@ async function LopenBackup() {
   L$("backupOverlay").classList.remove("hidden");
   await LrenderBackup();
 }
+// New words and review are both work worth protecting, but only one of them is
+// a number of words. Saying "你又学了 30 个词" about ten words reviewed twice
+// would be the app telling the learner something untrue about their own week.
+function LsinceText(st) {
+  if (st.sinceWords && st.since > st.sinceWords) return `你又学了 ${st.sinceWords} 个新词，还复习了一些`;
+  if (st.sinceWords) return `你又学了 ${st.sinceWords} 个新词`;
+  if (st.since) return "你又复习了一些词";
+  return "没有新的记录";
+}
 function LbackupBusy(msg) {
   const box = L$("backupContent");
   if (box) box.innerHTML = `<div class="backupRisk warn">${Lesc(msg)}</div>`;
@@ -45,7 +54,7 @@ async function LrenderBackup() {
     ? `<div class="backupRisk ok"><b>自动备份开着，而且是最新的。</b><br>写到文件夹 <b>${Lesc(st.folder.name)}</b>，每次打开应用时更新。</div>`
     : st.at === 0
       ? `<div class="backupRisk warn"><b>还没有备份过。</b><br>你的全部学习记录只存在这个浏览器里。清一次缓存、换台设备、手机重置，就全没了。</div>`
-      : `<div class="backupRisk warn"><b>上次备份${st.days === 0 ? "就在今天" : `是 ${st.days} 天前`}，之后你又学了 ${st.since} 个词。</b><br>这些只存在这个浏览器里。</div>`;
+      : `<div class="backupRisk warn"><b>上次备份${st.days === 0 ? "就在今天" : `是 ${st.days} 天前`}，之后${LsinceText(st)}。</b><br>这些只存在这个浏览器里。</div>`;
 
   const ways = [];
   ways.push(st.ways.folder

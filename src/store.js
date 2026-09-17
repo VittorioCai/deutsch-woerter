@@ -15,6 +15,7 @@
   const SCHEMA_VERSION = 2;
   const FLUSH_MS = 1500;
   const BACKUP_AT_WORK = "netzwerk_vocab_last_backup_work";
+  const BACKUP_AT_WORDS = "netzwerk_vocab_last_backup_words";
   const BACKUP_REMINDER_DAYS = 14;
   // A year of study in one browser is the whole risk, and it does not accumulate
   // on a calendar — somebody who gets through four hundred words in a week is
@@ -153,6 +154,13 @@
     } catch (_) { return 0; }
     return n;
   }
+  // How many words have been met at all. Counted apart from the work units
+  // because the two answer different questions and only one of them can be put
+  // in a sentence: a month of review moves the units and not this, so reporting
+  // units as "words you have learnt" would be saying something untrue.
+  function wordCount() {
+    try { return Object.keys(read(LEARN, {})).length; } catch (_) { return 0; }
+  }
   const readNum = (k) => { try { return +(localStorage.getItem(k) || 0) || 0; } catch (_) { return 0; } };
 
   // The File System Access API is desktop Chromium only. Everywhere else the
@@ -249,6 +257,7 @@
         at,
         days: at ? Math.floor((Date.now() - at) / 86400000) : null,
         since: Math.max(0, workUnits() - readNum(BACKUP_AT_WORK)),
+        sinceWords: Math.max(0, wordCount() - readNum(BACKUP_AT_WORDS)),
         folder: dir ? { name: dir.name || "已选文件夹", permission: await dirPermission(dir, false) } : null,
         ways: api.backupWays(),
       };
@@ -380,7 +389,7 @@
       if (days === null && st.since < BACKUP_REMINDER_WORK) return;
       const what = days === null
         ? "一年的学习记录只存在这台设备的浏览器里，<b>还没有备份过</b>。清一次缓存、换台设备，就全没了。"
-        : `距离上次备份 <b>${days}</b> 天，之后你又学了 <b>${st.since}</b> 个词。浏览器可能在长时间不用后清除本站数据。`;
+        : `距离上次备份 <b>${days}</b> 天${st.sinceWords ? `，之后你又学了 <b>${st.sinceWords}</b> 个新词` : "，之后你又复习了不少"}。浏览器可能在长时间不用后清除本站数据。`;
       const actions = [];
       if (st.ways.folder) actions.push({ label: "选个文件夹自动备份", run: (row) => { api.chooseBackupFolder().then(() => row.remove()).catch(() => {}) } });
       if (st.ways.share) actions.push({ label: "发送备份…", run: (row) => { api.shareBackup().then(() => row.remove()).catch(() => {}) } });
@@ -392,9 +401,10 @@
       try {
         localStorage.setItem(BACKUP_AT, String(Date.now()));
         localStorage.setItem(BACKUP_AT_WORK, String(workUnits()));
+        localStorage.setItem(BACKUP_AT_WORDS, String(wordCount()));
       } catch (_) {}
     },
-    workUnits,
+    workUnits, wordCount,
     download,
     downloadText,
   };
