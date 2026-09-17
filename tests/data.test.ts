@@ -544,6 +544,87 @@ describe('when a word comes back', () => {
     expect(at(12)).toBe(90 * DAY);
   });
 
+  // The lapse used to leave the word due in ten minutes, so every mistake made
+  // in a round came straight back as 到期复习 on the home screen: the more you
+  // got wrong, the longer the list, and the list is what people feel.
+  describe('a missed question is asked again before the round ends', () => {
+    type Q = { type: string; c: { id: string }; spot?: boolean; retry?: boolean; tries?: number };
+    const round = (progress: Record<string, S> = {}, spelling = true) => {
+      const api = load<{
+        Lrecord(c: { id: string }, ok: boolean, type: string): { again: boolean; tomorrow: boolean };
+        Lstate(c: { id: string }): S;
+        Lmastered(s: S): boolean;
+        queue(): Q[];
+        start(q: Q[]): void;
+        advance(): void;
+      }>('learn.core.js', '{ Lrecord, Lstate, Lmastered, queue: () => learnQueue, start: (q) => { learnQueue = q; learnPos = 0; learnSpelling = spelling }, advance: () => { learnPos++ } }', {
+        DWStore: { KEYS: { LEARN: 'l' }, read: () => progress, onMigrated: () => {}, prefs: () => ({}), queue: () => {} },
+        // Lsave refreshes the counters after every answer; the stub has no elements
+        document: { ...documentStub, getElementById: () => null },
+        CARDS: [],
+        spelling,
+      });
+      return api;
+    };
+    const w = { id: 'w' };
+    const HOUR = 60 * 60 * 1000;
+
+    it('appends the same question to the end of the round, once', () => {
+      const api = round();
+      api.start([{ type: 'spell', c: w }]);
+      const r = api.Lrecord(w, false, 'spell');
+      expect(r.again).toBe(true);
+      expect(api.queue()).toHaveLength(2);
+      expect(api.queue()[1]).toMatchObject({ type: 'spell', c: w, retry: true, tries: 1 });
+      // until it is answered, the word is only a ten-minute lapse (an abandoned round)
+      expect((api.Lstate(w).due as number) - Date.now()).toBeLessThanOrEqual(10 * 60 * 1000);
+    });
+
+    it('sends a repaired word to tomorrow with no cycle credit', () => {
+      const api = round();
+      api.start([{ type: 'spell', c: w }]);
+      api.Lrecord(w, false, 'spell');
+      api.advance();
+      api.Lrecord(w, true, 'spell');
+      const s = api.Lstate(w);
+      expect(s.cycles).toBe(0);
+      expect(s.spellingPass).toBe(true);
+      const gap = (s.due as number) - Date.now();
+      expect(gap).toBeGreaterThan(23 * HOUR);
+      expect(gap).toBeLessThan(25 * HOUR);
+    });
+
+    it('gives up after two retries and says tomorrow instead of ten minutes', () => {
+      const api = round();
+      api.start([{ type: 'recognize', c: w }]);
+      expect(api.Lrecord(w, false, 'recognize').again).toBe(true);
+      api.advance();
+      expect(api.Lrecord(w, false, 'recognize').again).toBe(true);
+      api.advance();
+      const last = api.Lrecord(w, false, 'recognize');
+      expect(last.again).toBe(false);
+      expect(last.tomorrow).toBe(true);
+      expect(api.queue()).toHaveLength(3);
+      expect((api.Lstate(w).due as number) - Date.now()).toBeGreaterThan(23 * HOUR);
+    });
+
+    it('costs a mastered word one rung of the ladder, not the whole ladder', () => {
+      const api = round({ w: { introduced: true, strength: 5, cycles: 3, spellingPass: true, known: true, due: 1 } });
+      api.start([{ type: 'spell', c: w, spot: true }]);
+      api.Lrecord(w, false, 'spell');
+      expect(api.Lmastered(api.Lstate(w))).toBe(false);
+      expect(api.queue()[1]).toMatchObject({ spot: true, retry: true });
+      api.advance();
+      api.Lrecord(w, true, 'spell');
+      const s = api.Lstate(w);
+      expect(s.cycles).toBe(2);
+      expect(api.Lmastered(s)).toBe(false);
+      const gap = (s.due as number) - Date.now();
+      expect(gap).toBeGreaterThan(2.9 * 24 * HOUR);
+      expect(gap).toBeLessThan(3.1 * 24 * HOUR);
+    });
+  });
+
   it('brings a mastered word back once its interval is up, oldest first', () => {
     const now = Date.now();
     const { LspotCards, LdueCards } = srs(

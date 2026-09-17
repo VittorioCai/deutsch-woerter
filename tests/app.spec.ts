@@ -243,6 +243,9 @@ test('a missed word comes back this session instead of in two weeks', async ({ p
 });
 
 test('never renders the correct answer twice in one multiple-choice question', async ({ page }) => {
+  // A blind walk answers most questions wrong, and every miss now adds a retry
+  // to the round, so the same 70 steps take longer than they used to.
+  test.slow();
   await open(page);
   // A1 Kapitel 1 contains several words that share a meaning ("Deutsch"/"Deutsch",
   // "das Würstchen"/"das Würstchen", five words glossed "the"), which used to
@@ -2070,4 +2073,58 @@ test('the introduction card has one button, and the rest is small print', async 
   await expect(page.locator('#learnBody .cardLinks [data-edit]')).toHaveCount(1);
   await link.click();
   await expect(page.locator('#lMastered')).toHaveText('1');
+});
+
+// Every mistake used to come back ten minutes later as 到期复习 on the home
+// screen, so a bad round left a longer list than it started with. The question
+// is asked again before the round ends instead, and the word comes back
+// tomorrow at the earliest.
+test('a wrong answer is asked again before the round ends, not ten minutes later', async ({ page }) => {
+  await open(page);
+  await page.locator('#goLearn').click();
+  await page.selectOption('#learnLevel', 'A1');
+  await page.selectOption('#learnChapter', '1');
+  await openSettings(page);
+  await page.selectOption('#learnCount', '5');
+  await page.locator('#learnSpellToggle').check();
+  await page.locator('#learnStartBtn').click();
+
+  const answers = new Map<string, string>(); // meaning shown → German, learnt from the feedback
+  let retries = 0, misses = 0;
+  for (let i = 0; i < 120; i++) {
+    const badge = (await page.locator('#learnBadge').textContent()) || '';
+    if (/本轮完成/.test(badge)) break;
+    if (/再来一次/.test(badge)) retries++;
+    if (await page.locator('#learnRemember').count()) { await page.locator('#learnRemember').click(); continue }
+    if (await page.locator('#learnBody .choice').count()) {
+      await page.locator('#learnBody .choice').first().click();
+    } else {
+      const zh = ((await page.locator('#learnBody .learnZh').textContent()) || '').trim();
+      const known = answers.get(zh);
+      if (known) await page.locator('#learnAnswer').fill(known);
+      else { await page.locator('#learnAnswer').fill('zzz'); misses++ }
+      await page.locator('#learnSubmit').click();
+      if (!known) {
+        await expect(page.locator('#learnFeedback')).toContainText('本轮末尾再问一次');
+        answers.set(zh, ((await page.locator('#learnFeedback .deAnswer').textContent()) || '').trim());
+      }
+    }
+    await page.locator('#learnNextBtn').click();
+  }
+  expect(misses).toBe(5);
+  expect(retries).toBeGreaterThanOrEqual(5);
+  await expect(page.locator('#learnBadge')).toContainText('本轮完成');
+
+  // nothing is left due in ten minutes: every word of the round comes back tomorrow at the earliest
+  const cards = await deck(page);
+  const ids = cards.filter((c) => c.level === 'A1' && String(c.chapter) === '1').map((c) => c.id);
+  const now = Date.now();
+  let learnt = 0;
+  for (const id of ids) {
+    const s = await stateOf(page, id);
+    if (!s || !s.introduced) continue;
+    learnt++;
+    expect((s.due as number) - now, `${id} is due too soon`).toBeGreaterThan(20 * 60 * 60 * 1000);
+  }
+  expect(learnt).toBe(5);
 });
