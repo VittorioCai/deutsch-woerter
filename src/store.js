@@ -387,6 +387,10 @@
       const days = st.at ? st.days : null;
       if (days !== null && days < BACKUP_REMINDER_DAYS && st.since < BACKUP_REMINDER_WORK) return;
       if (days === null && st.since < BACKUP_REMINDER_WORK) return;
+      // The home screen carries a standing backup line that turns amber on the
+      // same conditions and opens the same panel. Where it exists, a notice on
+      // top of it would be the same reminder twice, on every page.
+      if (document.getElementById("homeBackupLine")) return;
       const what = days === null
         ? "一年的学习记录只存在这台设备的浏览器里，<b>还没有备份过</b>。清一次缓存、换台设备，就全没了。"
         : `距离上次备份 <b>${days}</b> 天${st.sinceWords ? `，之后你又学了 <b>${st.sinceWords}</b> 个新词` : "，之后你又复习了不少"}。浏览器可能在长时间不用后清除本站数据。`;

@@ -86,15 +86,37 @@ async function LrenderBackup() {
     await LrenderBackup();
   });
   wire("backupExport", async () => { DWStore.exportBackup(); await LrenderBackup() });
+  LrenderBackupLine();
+}
+// One line on the home screen, always there: on a phone there is no automatic
+// backup, so being able to see how stale the last one is does the work a folder
+// does on a desktop. Stale turns the line amber.
+let LbackupLineBusy = false;
+async function LrenderBackupLine() {
+  const el = L$("homeBackupText");
+  if (!el || LbackupLineBusy || typeof CARDS === "undefined" || !CARDS.length) return;
+  LbackupLineBusy = true;
+  try {
+    const st = await DWStore.backupState();
+    const auto = st.folder && st.folder.permission === "granted";
+    const stale = !auto && (st.at === 0 || (st.days !== null && st.days >= 14) || st.since >= 60);
+    const text = auto ? `自动备份开着 · 写到 ${st.folder.name}`
+      : st.at === 0 ? "还没有备份过"
+      : `上次备份${st.days === 0 ? "就在今天" : `是 ${st.days} 天前`}，之后${LsinceText(st)}`;
+    el.textContent = `🛟 ${text}`;
+    const line = L$("homeBackupLine");
+    if (line) line.classList.toggle("stale", !!stale);
+  } catch (e) { /* the line is a courtesy; the panel is the real thing */ }
+  finally { LbackupLineBusy = false; }
 }
 function LinitBackupUI() {
-  const anchor = L$("exportBtn");
-  if (anchor && !L$("backupBtn")) {
+  const line = L$("homeBackupLine"), fallback = L$("exportBtn");
+  if (!L$("backupBtn") && (line || fallback)) {
     const b = document.createElement("button");
     b.id = "backupBtn";
     b.className = "secondary";
-    b.textContent = "🛟 备份";
-    anchor.before(b);
+    b.textContent = "备份";
+    if (line) line.appendChild(b); else fallback.before(b);
     b.onclick = LopenBackup;
   }
   LbuildBackupUI();

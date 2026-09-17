@@ -27,8 +27,12 @@ test.beforeEach(async ({ page }) => {
   await page.route('**://*.wikimedia.org/**', (route) => route.abort('failed'));
 });
 
+// #homeView sits inside #app, which is shown only once IndexedDB has handed the
+// deck back. On a slow machine that can take longer than the default 5s, and
+// the test would then report a boot that had merely not finished — so both
+// waits get the same generous limit.
 const ready = async (page: Page) => {
-  await expect(page.locator('#homeView')).toBeVisible();
+  await expect(page.locator('#homeView')).toBeVisible({ timeout: 20000 });
   await expect(page.locator('#learnStartBtn')).toHaveText('开始学新词', { timeout: 20000 });
 };
 
@@ -40,6 +44,12 @@ const seedDeck = async (page: Page) => {
     const d = (window as any).DWDeck;
     await d.save(d.parse(raw, 'fixture.json'));
   }, FIXTURE);
+};
+
+// The learn page's settings live in a collapsed section under the card, so a
+// test that touches a setting opens it first — the way a person would.
+const openSettings = async (page: Page) => {
+  await page.locator('#learnSettings').evaluate((d) => { (d as HTMLDetailsElement).open = true; });
 };
 
 const open = async (page: Page) => {
@@ -236,6 +246,7 @@ test('never renders the correct answer twice in one multiple-choice question', a
   await page.locator('#goLearn').click();
   await page.selectOption('#learnLevel', 'A1');
   await page.selectOption('#learnChapter', '1');
+  await openSettings(page);
   await page.selectOption('#learnCount', '15');
   await page.locator('#learnStartBtn').click();
 
@@ -337,6 +348,7 @@ test('a chapter-specific sense does not announce itself among the options', asyn
   await page.locator('#goLearn').click();
   await page.selectOption('#learnLevel', 'A1');
   await page.selectOption('#learnChapter', '4');
+  await openSettings(page);
   await page.selectOption('#learnCount', '10');
   await page.locator('#learnStartBtn').click();
 
@@ -403,7 +415,6 @@ test('a mastered word comes back for a spot check instead of vanishing', async (
 
 test('gender drill asks for der/die/das and scores per article', async ({ page }) => {
   await open(page);
-  await page.locator('#goLearn').click();
   await page.locator('#learnDrillBtn').click();
   await expect(page.locator('#drillOverlay')).toBeVisible();
   await expect(page.locator('#drillContent')).toContainText('性别专项');
@@ -427,7 +438,6 @@ test('gender drill asks for der/die/das and scores per article', async ({ page }
 
 test('plural drill accepts every attested plural of the same noun', async ({ page }) => {
   await open(page);
-  await page.locator('#goLearn').click();
   await page.locator('#learnDrillBtn').click();
   await page.locator('#tabPlural').click();
   await expect(page.locator('#drillContent')).toContainText('复数专项');
@@ -447,6 +457,7 @@ test('a reflexive verb spelled with its sich is not marked wrong', async ({ page
   await page.locator('#goLearn').click();
   await page.selectOption('#learnLevel', 'A1');
   await page.selectOption('#learnChapter', '4');
+  await openSettings(page);
   await page.selectOption('#learnCount', '5');
   await page.locator('#learnSpellToggle').check();
   await page.locator('#learnStartBtn').click();
@@ -482,7 +493,6 @@ test('a reflexive verb spelled with its sich is not marked wrong', async ({ page
 
 test('haben/sein drill asks for the auxiliary and scores each one apart', async ({ page }) => {
   await open(page);
-  await page.locator('#goLearn').click();
   await page.locator('#learnDrillBtn').click();
   await page.locator('#tabAux').click();
   await expect(page.locator('#drillContent')).toContainText('haben / sein');
@@ -514,7 +524,6 @@ test('haben/sein drill asks for the auxiliary and scores each one apart', async 
 
 test('cloze blanks the word out of its own example without leaking it', async ({ page }) => {
   await open(page);
-  await page.locator('#goLearn').click();
   await page.locator('#learnDrillBtn').click();
   await page.locator('#tabCloze').click();
   await expect(page.locator('#drillContent')).toContainText('例句填空');
@@ -571,7 +580,6 @@ test('wrong-book explains what kind of mistake was made', async ({ page }) => {
   }, [WRONG_KEY, SCHEMA_KEY, noun] as const);
   await page.reload();
   await ready(page);
-  await page.locator('#goLearn').click();
   await page.locator('#learnWrongBtn').click();
   await expect(page.locator('#wrongOverlay')).toBeVisible();
   const summary = page.locator('.causeBox');
@@ -597,7 +605,6 @@ test('dictation asks by ear and does not leak the word', async ({ page }) => {
     (window as any).SpeechSynthesisUtterance = class { text: string; lang = ''; rate = 1; constructor(t: string) { this.text = t } };
   });
   await open(page);
-  await page.locator('#goLearn').click();
   await page.locator('#learnDrillBtn').click();
   await page.locator('#tabDictation').click();
   await expect(page.locator('#drillContent')).toContainText('听写');
@@ -682,6 +689,7 @@ test('spelling can be switched off without stalling review pacing', async ({ pag
   await page.locator('#goLearn').click();
   await page.selectOption('#learnLevel', 'A1');
   await page.selectOption('#learnChapter', '1');
+  await openSettings(page);
   await page.selectOption('#learnCount', '5');
   await page.locator('#learnSpellToggle').uncheck();
   await expect(page.locator('#learnSpellNote')).toContainText('不会进入「已掌握」');
@@ -827,6 +835,7 @@ test('the two spelling toggles stay in sync', async ({ page }) => {
   await expect(page.locator('#homeSpellToggle')).toBeChecked();
   await page.locator('#homeSpellToggle').uncheck();
   await page.locator('#goLearn').click();
+  await openSettings(page);
   await expect(page.locator('#learnSpellToggle')).not.toBeChecked();
   await page.locator('#learnSpellToggle').check();
   await page.locator('#modeBack').click();
@@ -864,6 +873,7 @@ test('speech picks the best German voice the device has', async ({ page }) => {
   await page.locator('#goLearn').click();
 
   // English is excluded; the premium German voice wins
+  await openSettings(page);
   const options = await page.locator('#voicePick option').allTextContents();
   expect(options.some((o) => /Samantha/.test(o))).toBe(false);
   expect(options[0]).toContain('Premium');
@@ -882,6 +892,7 @@ test('speech picks the best German voice the device has', async ({ page }) => {
   await page.reload();
   await ready(page);
   await page.locator('#goLearn').click();
+  await openSettings(page);
   await page.locator('#voiceTest').click();
   await expect.poll(() => page.evaluate(() => (window as any).__spoken.length)).toBeGreaterThan(0);
   const after = await page.evaluate(() => {
@@ -930,11 +941,13 @@ test('round size offers larger sets and remembers the choice', async ({ page }) 
     .toEqual(['5', '10', '15', '20', '30', '50']);
   await expect(page.locator('#learnCount')).toHaveValue('10');
 
+  await openSettings(page);
   await page.selectOption('#learnCount', '30');
   await page.evaluate(() => (window as any).DWStore.flush());
   await page.reload();
   await ready(page);
   await page.locator('#goLearn').click();
+  await openSettings(page);
   await expect(page.locator('#learnCount')).toHaveValue('30');
 
   // the size actually drives the session
@@ -1007,6 +1020,7 @@ test('plays the recorded pronunciation and caches it', async ({ page }) => {
   const requests = await stubAudio(page);
   await open(page);
   await page.locator('#goLearn').click();
+  await openSettings(page);
   await page.locator('#voiceTest').click();   // speaks "Haus"
 
   await expect.poll(() => requests.length).toBe(1);
@@ -1018,6 +1032,7 @@ test('plays the recorded pronunciation and caches it', async ({ page }) => {
   expect(await page.evaluate(() => (window as any).__spoken)).toEqual([]); // no synthesis
 
   // second play comes from the cache, not the network
+  await openSettings(page);
   await page.locator('#voiceTest').click();
   await expect.poll(() => page.evaluate(() => (window as any).__played.length)).toBe(2);
   expect(requests.length).toBe(1);
@@ -1027,6 +1042,7 @@ test('falls back to synthesis when a word has no recording, and stops retrying i
   const requests = await stubAudio(page, { status: 404 });
   await open(page);
   await page.locator('#goLearn').click();
+  await openSettings(page);
   await page.locator('#voiceTest').click();
 
   await expect.poll(() => page.evaluate(() => (window as any).__spoken)).toEqual(['Haus']);
@@ -1034,6 +1050,7 @@ test('falls back to synthesis when a word has no recording, and stops retrying i
   expect(requests.length).toBe(1);
 
   // a known miss is remembered, so the same word is not fetched again
+  await openSettings(page);
   await page.locator('#voiceTest').click();
   await expect.poll(() => page.evaluate(() => (window as any).__spoken.length)).toBe(2);
   expect(requests.length).toBe(1);
@@ -1043,6 +1060,7 @@ test('recorded audio can be turned off', async ({ page }) => {
   const requests = await stubAudio(page);
   await open(page);
   await page.locator('#goLearn').click();
+  await openSettings(page);
   await expect(page.locator('#recordedToggle')).toBeChecked();
   await expect(page.locator('#recordedNote')).toContainText('Wikimedia Commons');
 
@@ -1058,6 +1076,7 @@ test('a network failure still produces sound', async ({ page }) => {
   await page.route('**upload.wikimedia.org/**', (route) => route.abort('failed'));
   await open(page);
   await page.locator('#goLearn').click();
+  await openSettings(page);
   await page.locator('#voiceTest').click();
   await expect.poll(() => page.evaluate(() => (window as any).__spoken)).toEqual(['Haus']);
 });
@@ -1163,7 +1182,6 @@ test('the demo deck is one click away and is a working app, not a sample', async
   await expect(page.locator('#prompt')).not.toHaveText('');
   await page.locator('#modeBack').click();
 
-  await page.locator('#goLearn').click();
   await page.locator('#learnDrillBtn').click();
   await expect(page.locator('#drillStart')).toBeEnabled();
   await page.locator('#tabPlural').click();
@@ -1182,6 +1200,7 @@ test('the learning card explains why the word is what it is', async ({ page }) =
   await page.locator('#goLearn').click();
   await page.selectOption('#learnLevel', 'A2');
   await page.selectOption('#learnChapter', '6');
+  await openSettings(page);
   await page.selectOption('#learnCount', '10');
   await page.locator('#learnStartBtn').click();
   await expect(page.locator('#learnBody .learnWord')).toBeVisible();
@@ -1287,7 +1306,6 @@ test('the position moves on by itself when a Kapitel runs out', async ({ page })
 
 test('a word can be looked up by German, by Chinese, and without its umlaut', async ({ page }) => {
   await open(page);
-  await page.locator('#goLearn').click();
   await page.locator('#learnBrowseBtn').click();
   await expect(page.locator('#browseOverlay')).toBeVisible();
 
@@ -1316,7 +1334,6 @@ test('a word can be looked up by German, by Chinese, and without its umlaut', as
 test('a whole Kapitel can be marked known without clicking through it', async ({ page }) => {
   await open(page);
   page.on('dialog', (d) => d.accept());
-  await page.locator('#goLearn').click();
   await page.locator('#learnBrowseBtn').click();
   await page.locator('.mapTile', { hasText: 'Kapitel 2' }).first().click();
   await expect(page.locator('.mapActions')).toContainText('A1 Kapitel 2');
@@ -1340,7 +1357,6 @@ test('a whole Kapitel can be marked known without clicking through it', async ({
 
 test('the preposition drill asks which one, and does not print it in the hint', async ({ page }) => {
   await open(page);
-  await page.locator('#goLearn').click();
   await page.locator('#learnDrillBtn').click();
   await page.locator('#tabRektion').click();
   await expect(page.locator('#drillContent .coverage')).toContainText('介词 + 格');
@@ -1378,7 +1394,6 @@ test('the preposition drill asks which one, and does not print it in the hint', 
 
 test('a verb governing two prepositions is not marked wrong for the other one', async ({ page }) => {
   await open(page);
-  await page.locator('#goLearn').click();
   await page.locator('#learnDrillBtn').click();
   await page.locator('#tabRektion').click();
   // sprechen takes mit +D and über +A. Both are right, so neither may turn up
@@ -1411,7 +1426,6 @@ test('a verb governing two prepositions is not marked wrong for the other one', 
 
 test('the conjugation drill wants er nimmt, not er nehmt', async ({ page }) => {
   await open(page);
-  await page.locator('#goLearn').click();
   await page.locator('#learnDrillBtn').click();
   await page.locator('#tabConj').click();
   // Four ways to get a conjugation wrong; one score would hide the only one
@@ -1546,8 +1560,11 @@ test('a reminder arrives for work done, not only for days elapsed', async ({ pag
   await seedProgress(page, 30, { backedUpAt: Date.now() - 3600_000, work: 0 });
   await page.reload();
   await ready(page);
-  await expect(page.locator('.dwNoticeItem.warn')).toContainText('之后你又学了 30 个新词');
-  await expect(page.locator('.dwNoticeItem.warn')).toContainText('0 天');
+  // The standing line on the home screen is the reminder: amber, and saying
+  // what is at stake. A notice on top of it would be the same thing twice.
+  await expect(page.locator('#homeBackupLine')).toHaveClass(/stale/);
+  await expect(page.locator('#homeBackupLine')).toContainText('又学了 30 个新词');
+  await expect(page.locator('.dwNoticeItem.warn')).toHaveCount(0);
 });
 
 test('nothing is said when little has changed since the last backup', async ({ page }) => {
@@ -1555,6 +1572,8 @@ test('nothing is said when little has changed since the last backup', async ({ p
   await seedProgress(page, 3, { backedUpAt: Date.now() - 3600_000, work: 0 });
   await page.reload();
   await ready(page);
+  await expect(page.locator('#homeBackupLine')).toContainText('上次备份就在今天');
+  await expect(page.locator('#homeBackupLine')).not.toHaveClass(/stale/);
   await expect(page.locator('.dwNoticeItem.warn')).toHaveCount(0);
 });
 
@@ -1631,7 +1650,6 @@ test('a phone is offered the share sheet, which is how a file reaches iCloud', a
 
 test('a correction survives re-importing the word list it corrects', async ({ page }) => {
   await open(page);
-  await page.locator('#goLearn').click();
   await page.locator('#learnBrowseBtn').click();
   await page.locator('#browseInput').fill('Blume');
   const before = (await deck(page)).find((c) => c.de === 'die Blume')!;
@@ -1656,7 +1674,6 @@ test('a correction survives re-importing the word list it corrects', async ({ pa
   await ready(page);
   const after = (await deck(page)).find((c) => c.de === 'die Blume')!;
   expect(after.id).toBe(before.id);
-  await page.locator('#goLearn').click();
   await page.locator('#learnBrowseBtn').click();
   await page.locator('#browseInput').fill('Blume');
   const row = page.locator('.browseItem').first();
@@ -1668,7 +1685,6 @@ test('a correction survives re-importing the word list it corrects', async ({ pa
 
 test('an edit reaches the drills that read the column it changed', async ({ page }) => {
   await open(page);
-  await page.locator('#goLearn').click();
   await page.locator('#learnBrowseBtn').click();
   await page.locator('#browseInput').fill('kochen');
   await page.locator('.browseItem [data-edit]').first().click();
@@ -1686,7 +1702,6 @@ test('an edit reaches the drills that read the column it changed', async ({ page
 test('a correction can be taken back, and the deck text comes back with it', async ({ page }) => {
   await open(page);
   page.on('dialog', (d) => d.accept());
-  await page.locator('#goLearn').click();
   await page.locator('#learnBrowseBtn').click();
   await page.locator('#browseInput').fill('Blume');
   await page.locator('.browseItem [data-edit]').first().click();
@@ -1704,7 +1719,6 @@ test('a correction can be taken back, and the deck text comes back with it', asy
 
 test('corrections travel in the backup, and come back on restore', async ({ page }) => {
   await open(page);
-  await page.locator('#goLearn').click();
   await page.locator('#learnBrowseBtn').click();
   await page.locator('#browseInput').fill('Blume');
   await page.locator('.browseItem [data-edit]').first().click();
@@ -1719,7 +1733,6 @@ test('corrections travel in the backup, and come back on restore', async ({ page
   await page.evaluate(() => (window as any).DWPatches.replace({}));
   await page.reload();
   await ready(page);
-  await page.locator('#goLearn').click();
   await page.locator('#learnBrowseBtn').click();
   await page.locator('#browseInput').fill('Blume');
   await expect(page.locator('.browseItem').first()).not.toContainText('补过的');
@@ -1903,13 +1916,14 @@ test('a round of 单词检测 starts with what the schedule wants today', async 
 
 test('a verb is explained by the pattern it belongs to, not as three separate facts', async ({ page }) => {
   await open(page);
-  await page.locator('#goLearn').click();
   await page.locator('#learnBrowseBtn').click();
   await page.locator('#browseInput').fill('gehen');
   await page.locator('#browseClose').click();
 
+  await page.locator('#goLearn').click();
   await page.selectOption('#learnLevel', 'A1');
   await page.selectOption('#learnChapter', '4');
+  await openSettings(page);
   await page.selectOption('#learnCount', '10');
   await page.locator('#learnStartBtn').click();
 
@@ -1933,6 +1947,7 @@ test('the other sense of a word is shown, not only kept out of the wrong answers
   await page.locator('#goLearn').click();
   await page.selectOption('#learnLevel', 'A1');
   await page.selectOption('#learnChapter', '4');
+  await openSettings(page);
   await page.selectOption('#learnCount', '10');
   await page.locator('#learnStartBtn').click();
   for (let i = 0; i < 10; i++) {
@@ -1995,4 +2010,29 @@ test('browsing another Kapitel does not move the position, and the home screen s
   // Looking at a chapter is not having reached it.
   await expect(page.locator('#posBar')).toContainText('学到 A1 Kapitel 3');
   await expect(page.locator('#posBar')).toContainText('上次在看 A1 Kapitel 1');
+});
+
+// The layout promises that the doc made: on a phone the learning card is on the
+// first screen, the entrances live on the home screen, and the backup line is
+// always there.
+test('on a phone the card is on the first screen and the entrances are on the home screen', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page);
+  for (const id of ['goLearn', 'goQuiz', 'learnDrillBtn', 'learnBrowseBtn', 'learnWrongBtn', 'learnMasteredBtn']) {
+    await expect(page.locator(`#homeEntries #${id}`)).toBeVisible();
+  }
+  await expect(page.locator('#homeBackupLine')).toContainText('备份');
+  await expect(page.locator('#homeBackupLine #backupBtn')).toBeVisible();
+
+  await page.locator('#goLearn').click();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const card = await page.locator('#learnCard').boundingBox();
+  expect(card).not.toBeNull();
+  // The card's word area starts inside the first 844px, without scrolling.
+  expect(card!.y).toBeLessThan(844 - 200);
+  // Settings are folded until asked for.
+  expect(await page.locator('#learnSettings').evaluate((d) => (d as HTMLDetailsElement).open)).toBe(false);
+  await page.locator('#learnSettingsBtn').click();
+  expect(await page.locator('#learnSettings').evaluate((d) => (d as HTMLDetailsElement).open)).toBe(true);
+  await expect(page.locator('#learnCount')).toBeVisible();
 });

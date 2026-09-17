@@ -66,7 +66,7 @@ function LbrowseStyles() {
   if (document.getElementById("browseStyles")) return;
   const st = document.createElement("style");
   st.id = "browseStyles";
-  st.textContent = `.posBar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--soft);border:1px solid #d7deff;border-radius:14px;padding:11px 14px;margin-bottom:12px}.posBar:empty{display:none}.posNow{font-size:14px;line-height:1.5}.posAsk{display:flex;flex-direction:column;gap:3px;flex:1 1 220px}.posBar button{padding:8px 14px;font-size:13px}
+  st.textContent = `.posBar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:nowrap;background:var(--soft);border:1px solid #d7deff;border-radius:14px;padding:11px 14px;margin-bottom:12px}.posBar:empty{display:none}.posNow{font-size:14px;line-height:1.5;min-width:0;flex:1 1 auto}.posBar>button{flex:0 0 auto;white-space:nowrap}.posAsk{display:flex;flex-direction:column;gap:3px;flex:1 1 220px}.posBar button{padding:8px 14px;font-size:13px}
 .browseOverlay{position:fixed;inset:0;z-index:9998;background:rgba(18,25,38,.58);display:flex;align-items:flex-end;justify-content:center}.browseOverlay.hidden{display:none}.browseSheet{background:#fff;width:min(760px,100%);max-height:92vh;border-radius:22px 22px 0 0;padding:18px;overflow:auto;box-shadow:0 -16px 50px rgba(0,0,0,.18)}.browseHead{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:-18px;background:#fff;padding:16px 0 10px;z-index:2}.browseHead h2{margin:0;font-size:24px}#browseInput{margin-bottom:6px}
 .mapLevel{margin-top:14px}.mapLevel h3{margin:0 0 8px;font-size:15px;color:var(--muted)}.mapGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}.mapTile{text-align:left;background:#fff;border:1px solid var(--line);border-radius:12px;padding:9px 10px;font-weight:700;font-size:13px;cursor:pointer}.mapTile.on{border-color:var(--accent);box-shadow:0 0 0 2px rgba(49,94,251,.16)}.mapTile.here{background:var(--soft)}.mapBar{height:6px;border-radius:99px;background:#e9edf5;overflow:hidden;margin:7px 0 5px;display:flex}.mapBar i{display:block;height:100%}.mapBar .m{background:#0a8f55}.mapBar .l{background:#4a69ff}.mapCount{font-size:11px;color:var(--muted);font-weight:600}
 .mapActions{border:1px solid var(--line);border-radius:14px;padding:13px;margin-top:12px;background:#fbfcff}.mapActions h4{margin:0 0 4px;font-size:17px}.mapActions .row{margin-top:10px}.mapActions button{padding:9px 13px;font-size:13px}
@@ -88,7 +88,7 @@ function LrenderPosBar() {
     // move the position, so the bar says so instead of letting the two disagree
     // in silence.
     const sc = Lscope(), elsewhere = sc.level !== g.level || String(sc.chapter) !== g.chapter;
-    el.innerHTML = `<div class="posNow">📍 学到 <b>${Lesc(g.level)} Kapitel ${Lesc(g.chapter)}</b> · 本章还有 <b>${left}</b> 个新词没学（共 ${g.cards.length}）${elsewhere ? `<br><span class="small">学新词页上次在看 ${Lesc(sc.level)} Kapitel ${Lesc(String(sc.chapter))}</span>` : ""}</div><button class="secondary" id="posEdit">换一章</button>`;
+    el.innerHTML = `<div class="posNow">📍 学到 <b>${Lesc(g.level)} Kapitel ${Lesc(g.chapter)}</b> · 还有 <b>${left}</b> 个新词${elsewhere ? `<br><span class="small">学新词页上次在看 ${Lesc(sc.level)} Kapitel ${Lesc(String(sc.chapter))}</span>` : ""}</div><button class="secondary" id="posEdit">换一章</button>`;
   } else {
     el.innerHTML = `<div class="posAsk"><b>你已经学到哪一章了？</b><span class="small">不说的话，今日任务会从词库第一章开始给新词。</span></div><button class="primary" id="posEdit">告诉它</button>`;
   }
