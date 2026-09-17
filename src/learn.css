@@ -30,3 +30,19 @@
 .wrap.inPage>h1,.wrap.inPage>.sub{display:none}
 .boxLabel{display:inline-block;font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.08em;margin-right:8px}
 .sessionDone .big .ic{color:#c3cad8}
+@keyframes cardIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes sheetUp{from{opacity:.6;transform:translateY(24px)}to{opacity:1;transform:none}}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.025)}100%{transform:scale(1)}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+#learnBody.enter{animation:cardIn .18s ease-out}
+.feedback.show{animation:fadeUp .2s ease-out}
+#learnNextBtn,#nextBtn{animation:fadeUp .2s ease-out}
+.choice.correct{animation:pop .25s ease-out}
+.choice.wrong{animation:shake .25s ease-in-out}
+#homeView:not(.hidden),#learnView:not(.hidden),#quizView:not(.hidden){animation:fadeIn .15s ease-out}
+.browseSheet,.drillSheet,.wrongSheet,.masterSheet,.backupSheet,.editSheet{animation:sheetUp .22s ease-out}
+button{transition:transform .06s ease,background-color .12s ease,opacity .12s ease}
+button:not(:disabled):active{transform:scale(.98)}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

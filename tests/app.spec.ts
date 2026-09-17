@@ -2150,3 +2150,17 @@ test('sub-pages carry a slim top bar, and the entrances carry icons, not emoji',
   // the idle quiz page shows no dead zeros
   await expect(page.locator('#sNow')).toBeHidden();
 });
+
+// Motion is the difference between a page that swaps and one that moves; it
+// is also the first thing to switch off for anyone who asked their phone to.
+test('the next card slides in, unless the phone asks for no motion', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await open(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#learnStartBtn').click();
+  await expect(page.locator('#learnBody')).toHaveClass(/enter/);
+  const animation = () => page.locator('#learnBody').evaluate((el) => getComputedStyle(el).animationName);
+  expect(await animation()).toBe('cardIn');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  expect(await animation()).toBe('none');
+});
