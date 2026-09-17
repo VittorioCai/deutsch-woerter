@@ -58,13 +58,14 @@ npm run verify                    # tsc + vitest + build + playwright，CI 跑�
 | `src/learn.core.js` | 背词模式：今日任务、三层学习、拼写、SRS、发音 |
 | `src/index.html` | 单词检测模式（独立的一套进度模型） |
 | `src/store.js` | localStorage 全部读写、迁移、备份（含自动写文件夹） |
-| `src/deck.js` | 词库解析、卡片 id、IndexedDB |
+| `src/deck.js` | 词库解析、卡片 id、IndexedDB、`DWPatches` 补丁层 |
 | `src/insight.js` | 巧记规则表（性别/复合词/前缀，当场算） |
 | `src/drills-addon.js` | 专项训练：性别、复数、动词变位、haben/sein、介词+格、例句填空、听写 |
 | `src/wrongbook-addon.js` | 拼写错题本 + 错因分析 |
 | `src/mastered-addon.js` | 已掌握档案 |
 | `src/browse-addon.js` | 查词 + 章节地图 + 「学到哪了」的位置 |
 | `src/backup-addon.js` | 备份面板（文件夹 / 分享 / 下载） |
+| `src/edit-addon.js` | 应用内编辑词条（只改 zh/en/grammar/example） |
 
 ---
 
@@ -253,10 +254,20 @@ npm run verify                    # tsc + vitest + build + playwright，CI 跑�
   先把旧的复制成 `-previous.json` 再写新的
 - Chromium 重启后会掉权限，重新授权需要用户手势，所以那条通知本身就是那个手势
 
-**13. 词条本身不能改。** 校对、补释义、补例句目前只能在应用外做。
-一个"编辑此词条"、把改动作为**按 id 的补丁层**存进 IndexedDB（重新导入词库也不丢），
-就能让用户自己维护自己的词库，完全符合"词由你提供"的定位。
-注意：补丁只能改 `zh`/`en`/`grammar`/`example`——改 `de` 会重置进度，见上面的不变量。
+**13. 词条本身不能改。**　✅ **已做**
+新增 `src/edit-addon.js` + `DWPatches`（在 `deck.js` 里）：改动作为**按 id 的补丁层**
+存进 IndexedDB，**重新导入词库也不丢**。入口有两个：查词结果的每一行，和学习卡片的详情区
+（`Ldetails`，只在介绍页和答案揭晓后出现，不会在题目还开着的时候露出来）。
+- **只能改 `zh` / `en` / `grammar` / `example`。`de` 是只读的**，面板上写明了为什么：
+  卡片编号是 `level|chapter|de` 的哈希，改掉它不是编辑一张卡，是丢掉一张卡和它的全部历史
+- 每个字段都带一句说明这栏是给谁用的（`Plural: die Häuser`、`er nimmt, hat genommen`、
+  `Deutscher Satz.（中文）`），因为专项训练完全靠这几栏的格式
+- 「恢复词库原文」要能恢复，所以第一次编辑前先把原值记下来（`DWPatches.remember`）
+- 改完要让**已经渲染出来的界面**跟着变：`LcardsChanged()` 清掉各模块的缓存
+  （`ZH`、`LbrowseHays`、`LrektionCache`），并重画开着的查词面板和当前题目。
+  导入备份恢复补丁走的是同一个函数——这是测试里发现的：原本导入时开着的查词面板不会刷新
+- 补丁进备份（`snapshot().cardPatches`，version 6），导入时合并；
+  合并冲突时**保留本机的**，因为你正看着的就是本机这份
 
 **14. 杂项。** 没有深色模式（`learn.css` 和 `index.html` 里 0 处 `prefers-color-scheme`，
 几个 overlay 还硬编码了 `#fff`）。形容词比较级只有 9 条，不值得做专项。

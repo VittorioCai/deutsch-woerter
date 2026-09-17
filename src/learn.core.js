@@ -157,7 +157,7 @@ window.Linsight=Linsight;
 function Lexample(c){if(!c.example)return "";const de=LexampleDe(c),zh=LexampleZh(c);
  return `<div class="example"><b>例句</b> ${LspeakBtn(de)}<div class="exampleDe">${Lesc(de)}</div>${zh?`<button type="button" class="exampleZh" data-zh="${Lesc(zh)}">看中文</button>`:""}</div>`}
 document.addEventListener("click",e=>{const b=e.target.closest(".exampleZh");if(!b)return;e.preventDefault();const d=document.createElement("div");d.className="exampleZhShown";d.textContent=b.dataset.zh;b.replaceWith(d)});
-function Ldetails(c){return `${Linsight(c)}${c.grammar?`<div class="grammarBox"><b>词形信息</b><br>${Lesc(c.grammar)}</div>`:""}${Lexample(c)}`}
+function Ldetails(c){return `${Linsight(c)}${c.grammar?`<div class="grammarBox"><b>词形信息</b><br>${Lesc(c.grammar)}</div>`:""}${Lexample(c)}${typeof LeditBtn==="function"?`<div class="editRow">${LeditBtn(c.id)}</div>`:""}`}
 function Lrender(){const fb=L$("learnFeedback");fb.className="feedback";fb.innerHTML="";L$("learnNextBtn").style.display="none";learnAnswered=false;if(learnPos>=learnQueue.length)return Lfinish();const t=learnQueue[learnPos],c=t.c;L$("learnBadge").textContent=`${t.spot?"已掌握抽查 · ":""}${Llabel(t.type)} · ${learnPos+1}/${learnQueue.length}`;L$("learnBar").style.width=`${Math.round(learnPos/learnQueue.length*100)}%`;if(t.type==="intro")Lintro(c);else if(t.type==="recognize")Lrecognize(c);else if(t.type==="reverse")Lreverse(c);else Lspell(c)}
 function Lintro(c){L$("learnBody").innerHTML=`<div class="phaseTitle">先建立第一印象：今天不要求你一上来就默写。</div><div class="learnWord">${Lesc(c.de)}</div><div class="learnZh">${Lesc(Lmeaning(c))}</div><div class="learnEn">${Lesc(LmeaningMeta(c))}</div>${Ldetails(c)}<div class="learnActions"><button class="secondary" id="learnSpeak">🔊 发音</button><button class="secondary" id="learnHard">😵 很难记</button><button class="primary" id="learnRemember">记住了，继续</button><button class="secondary" id="learnKnown">这个我已经会</button></div><div class="sourceNote">发音优先使用真人录音，没有录音时用设备的德语 TTS；词形、语法信息和例句来自你导入的词库。</div>`;L$("learnSpeak").onclick=()=>Lspeak(c.de);L$("learnRemember").onclick=()=>LintroDone(c,false,false);L$("learnHard").onclick=()=>LintroDone(c,true,false);L$("learnKnown").onclick=()=>LintroDone(c,false,true)}
 function LintroDone(c,hard,known){const s=Lstate(c);s.introduced=true;s.last=Date.now();if(known){s.known=true;s.strength=5;s.spellingPass=true;s.cycles=3;s.due=Date.now()+30*24*60*60*1000;learnQueue=learnQueue.filter((t,i)=>i<=learnPos||t.c.id!==c.id)}else if(hard){s.hard=(s.hard||0)+1;s.strength=0;s.due=Date.now()}else{s.strength=Math.max(1,s.strength||0);s.due=Date.now()}Lsave(c,s);learnPos++;Lrender()}
@@ -277,7 +277,17 @@ const mode=(Object.keys(q).length+Object.keys(l).length)&&confirm("把备份【�
 if(mode==="merge"){progress=mergeProgress(progress,q,"last");learnProgress=mergeProgress(learnProgress,l,"last");wrongBook=mergeProgress(wrongBook,w,"lastAt")}else{progress=q;learnProgress=l;wrongBook=w}
 DWStore.queue(STORE_KEY,()=>progress);DWStore.queue(LEARN_KEY,()=>learnProgress);DWStore.queue(WRONG_KEY,()=>wrongBook);DWStore.flush();DWStore.markBackedUp();
 stats();Lstats();LhomeStats();if(typeof LupdateWrongBadge==="function")LupdateWrongBadge();if(typeof LupdateMasteredBadge==="function")LupdateMasteredBadge();
-alert(mode==="merge"?"备份已合并到现有记录。":"本机记录已被备份替换。")}catch(err){alert("无法识别这个备份文件。")}e.target.value=""};Lshow("home")}
+// Corrections ride along with the progress. Merging keeps what is already here
+// on a conflict, because the copy on this device is the one being looked at.
+let patched=0;
+if(d.cardPatches&&typeof d.cardPatches==="object"&&!Array.isArray(d.cardPatches)){
+ const cur=DWPatches.get(),next=mode==="merge"?Object.assign({},d.cardPatches,cur):d.cardPatches;
+ for(const id of Object.keys(next))if(next[id]&&Object.keys(next[id]).length)patched++;
+ await DWPatches.replace(next);
+ for(const c of LallLearningCards())if(next[c.id]||cur[c.id])LapplyPatchTo(c);
+ LcardsChanged();
+}
+alert((mode==="merge"?"备份已合并到现有记录。":"本机记录已被备份替换。")+(patched?`\n词条修改 ${patched} 条也一并恢复了。`:""))}catch(err){alert("无法识别这个备份文件。")}e.target.value=""};Lshow("home")}
 function LreadyFail(msg,retry){const b=L$("learnStartBtn");if(b){b.disabled=true;b.textContent="学习词库未就绪"}if(!LreadyFail.noticed){LreadyFail.noticed=true;DWStore.notice("bad",`<b>背词模式的数据没能加载。</b> ${Lesc(msg)}｜单词检测不受影响。`,[{label:"重新加载",run:row=>{row.remove();LreadyFail.noticed=false;retry()}}])}const body=L$("learnBody");if(body)body.innerHTML=`<div class="sessionDone"><div class="big">⚠️</div><h2>学习词库没能加载</h2><p class="sub">${Lesc(msg)}</p><div class="learnActions"><button class="primary" id="learnRetry">重新加载</button></div></div>`;const r=L$("learnRetry");if(r)r.onclick=()=>{if(body)body.innerHTML=`<div class="sessionDone"><div class="big">⏳</div><h2>正在重新加载…</h2></div>`;retry()}}
 async function Lready(){
   const b=L$("learnStartBtn");if(b)b.textContent="正在准备…";
@@ -310,4 +320,4 @@ function Lopener(){let q;try{q=new URLSearchParams(location.search)}catch(e){ret
   if(q.get("mastered")==="1"){Lshow("learn");if(typeof LopenMastered==="function")LopenMastered();return}
   if(q.get("wrong")==="1"){Lshow("learn");if(typeof LopenWrongBook==="function")LopenWrongBook();return}
   if(view==="learn"||view==="quiz")Lshow(view)}
-function Lboot(){LbuildShell();LinitWrongBookUI();LinitMasteredUI();LinitDrillUI();LinitBrowseUI();LinitBackupUI();Lready()}
+function Lboot(){LbuildShell();LinitWrongBookUI();LinitMasteredUI();LinitDrillUI();LinitBrowseUI();LinitBackupUI();LinitEditUI();Lready()}

@@ -144,7 +144,7 @@ function LrenderBrowse() {
 }
 function LbrowseRow(c) {
   const st = LcardStatus(c), zh = LhasZh(c) ? Lmeaning(c) : "", en = Lenglish(c);
-  return `<div class="browseItem"><div class="browseTop"><div class="browseWord">${Lesc(c.de)}</div><span class="browseTag ${st.key}">${st.label}</span></div><div>${zh ? `${Lesc(zh)}${en ? ` <span class="browseWhere">· ${Lesc(en)}</span>` : ""}` : Lesc(en)}</div><div class="browseWhere">${Lesc(c.level)} · Kapitel ${Lesc(String(c.chapter))}${c.grammar ? ` · ${Lesc(c.grammar)}` : ""}</div>${c.example ? `<div class="browseWhere">${Lesc(LexampleDe(c))}</div>` : ""}</div>`;
+  return `<div class="browseItem"><div class="browseTop"><div class="browseWord">${Lesc(c.de)}</div><span class="browseTag ${st.key}">${st.label}</span></div><div>${zh ? `${Lesc(zh)}${en ? ` <span class="browseWhere">· ${Lesc(en)}</span>` : ""}` : Lesc(en)}</div><div class="browseWhere">${Lesc(c.level)} · Kapitel ${Lesc(String(c.chapter))}${c.grammar ? ` · ${Lesc(c.grammar)}` : ""}</div>${c.example ? `<div class="browseWhere">${Lesc(LexampleDe(c))}</div>` : ""}<div class="editRow">${typeof LeditBtn === "function" ? LeditBtn(c.id) : ""}</div></div>`;
 }
 function LbindMapActions(i) {
   const gs = LchapGroups(), g = gs[i];

@@ -261,7 +261,65 @@ const DWDeck = (() => {
   return { parse, serialize, load, save, clear, getMeta, putMeta, delMeta, sha256Hex, idFor, withIds, COLUMNS, FORMAT };
 })();
 
+// Corrections made inside the app, kept apart from the deck they correct so that
+// re-importing the word list does not throw them away. Keyed by card id, which
+// is derived from level|chapter|de — which is also why `de` is not patchable:
+// changing it would not edit a card, it would abandon one and its history.
+const DWPatches = (() => {
+  const KEY = "card-patches";
+  const FIELDS = ["zh", "en", "grammar", "example"];
+  const originals = new Map();
+  let cache = null;
+  const snapshot = (c) => Object.fromEntries(FIELDS.map((k) => [k, c[k] || ""]));
+
+  async function load() {
+    try { cache = (await DWDeck.getMeta(KEY)) || {}; } catch (_) { cache = {}; }
+    return cache;
+  }
+  function apply(cards) {
+    const all = cache || {};
+    for (const c of cards) {
+      const p = all[c.id];
+      if (!p) continue;
+      if (!originals.has(c.id)) originals.set(c.id, snapshot(c));
+      for (const k of FIELDS) if (typeof p[k] === "string") c[k] = p[k];
+    }
+    return cards;
+  }
+  async function set(id, fields) {
+    const all = Object.assign({}, cache || {});
+    const kept = {};
+    for (const k of FIELDS) if (fields && typeof fields[k] === "string") kept[k] = fields[k];
+    if (Object.keys(kept).length) all[id] = kept; else delete all[id];
+    await DWDeck.putMeta(KEY, all);
+    cache = all;
+    return all;
+  }
+  async function replace(all) {
+    const clean = {};
+    for (const id of Object.keys(all || {})) {
+      const kept = {};
+      for (const k of FIELDS) if (typeof all[id][k] === "string") kept[k] = all[id][k];
+      if (Object.keys(kept).length) clean[id] = kept;
+    }
+    await DWDeck.putMeta(KEY, clean);
+    cache = clean;
+    return clean;
+  }
+  return {
+    FIELDS,
+    load, apply, set, replace,
+    get: () => cache || {},
+    clear: (id) => set(id, null),
+    // Called before the first edit of a card, while it still holds what the deck
+    // shipped, so "restore the original" has something to restore to.
+    remember(c) { if (!originals.has(c.id)) originals.set(c.id, snapshot(c)); },
+    original: (c) => originals.get(c.id) || snapshot(c),
+  };
+})();
+
 // A top-level const in a classic script is a lexical binding, not a window
 // property, and other modules reach for it by name off window — the same way
 // store.js publishes DWStore.
 window.DWDeck = DWDeck;
+window.DWPatches = DWPatches;

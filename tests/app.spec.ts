@@ -1624,3 +1624,114 @@ test('a phone is offered the share sheet, which is how a file reaches iCloud', a
   await expect.poll(() => page.evaluate(() => (window as any).__shared)).toEqual([['deutsch-woerter-backup.json']]);
   await expect(page.locator('.backupRisk')).toContainText('上次备份就在今天');
 });
+
+test('a correction survives re-importing the word list it corrects', async ({ page }) => {
+  await open(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#learnBrowseBtn').click();
+  await page.locator('#browseInput').fill('Blume');
+  const before = (await deck(page)).find((c) => c.de === 'die Blume')!;
+
+  await page.locator('.browseItem [data-edit]').first().click();
+  await expect(page.locator('.editWord')).toHaveText('die Blume');
+  // The headword is the card's identity, so the sheet says so instead of
+  // offering a box that would silently discard a word's whole history.
+  await expect(page.locator('.editLocked')).toContainText('德语词本身改不了');
+  await expect(page.locator('#editContent textarea')).toHaveCount(4);
+
+  await page.locator('#edit_zh').fill('花；花朵（可数）');
+  await page.locator('#edit_example').fill('Die Blume ist rot.（这朵花是红色的。）');
+  await page.locator('#editSave').click();
+  await expect(page.locator('#editOverlay')).toBeHidden();
+  await expect(page.locator('.browseItem').first()).toContainText('花；花朵（可数）');
+
+  // Re-importing the very deck that carries the old text must not undo the fix,
+  // and must not move the card's id.
+  await seedDeck(page);
+  await page.reload();
+  await ready(page);
+  const after = (await deck(page)).find((c) => c.de === 'die Blume')!;
+  expect(after.id).toBe(before.id);
+  await page.locator('#goLearn').click();
+  await page.locator('#learnBrowseBtn').click();
+  await page.locator('#browseInput').fill('Blume');
+  const row = page.locator('.browseItem').first();
+  await expect(row).toContainText('花；花朵（可数）');
+  await expect(row).toContainText('Die Blume ist rot.');
+  // Fields nobody touched still come from the deck.
+  await expect(row).toContainText('flower');
+});
+
+test('an edit reaches the drills that read the column it changed', async ({ page }) => {
+  await open(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#learnBrowseBtn').click();
+  await page.locator('#browseInput').fill('kochen');
+  await page.locator('.browseItem [data-edit]').first().click();
+  // kochen ships as a regular verb; teaching the app a Präteritum has to reach
+  // the conjugation drill, not just the card.
+  await page.locator('#edit_grammar').fill('er kocht, kochte, hat gekocht');
+  await page.locator('#editSave').click();
+  await page.locator('#browseClose').click();
+
+  await page.locator('#learnDrillBtn').click();
+  await page.locator('#tabConj').click();
+  await expect(page.locator('.drillRow', { hasText: 'Präteritum' })).toContainText('词库 2');
+});
+
+test('a correction can be taken back, and the deck text comes back with it', async ({ page }) => {
+  await open(page);
+  page.on('dialog', (d) => d.accept());
+  await page.locator('#goLearn').click();
+  await page.locator('#learnBrowseBtn').click();
+  await page.locator('#browseInput').fill('Blume');
+  await page.locator('.browseItem [data-edit]').first().click();
+  await page.locator('#edit_zh').fill('错的');
+  await page.locator('#editSave').click();
+  await expect(page.locator('.browseItem').first()).toContainText('错的');
+
+  await page.locator('.browseItem [data-edit]').first().click();
+  await expect(page.locator('.editChanged')).toHaveCount(1);
+  await page.locator('#editRevert').click();
+  await expect(page.locator('#editOverlay')).toBeHidden();
+  await expect(page.locator('.browseItem').first()).toContainText('花');
+  await expect(page.locator('.browseItem').first()).not.toContainText('错的');
+});
+
+test('corrections travel in the backup, and come back on restore', async ({ page }) => {
+  await open(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#learnBrowseBtn').click();
+  await page.locator('#browseInput').fill('Blume');
+  await page.locator('.browseItem [data-edit]').first().click();
+  await page.locator('#edit_zh').fill('花（补过的）');
+  await page.locator('#editSave').click();
+  await expect(page.locator('#editOverlay')).toBeHidden();
+
+  const snap = await page.evaluate(() => (window as any).DWStore.snapshot());
+  expect(Object.values((snap as { cardPatches: Record<string, { zh: string }> }).cardPatches)).toEqual([{ zh: '花（补过的）' }]);
+
+  // Wipe the correction the way clearing site data would, then restore.
+  await page.evaluate(() => (window as any).DWPatches.replace({}));
+  await page.reload();
+  await ready(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#learnBrowseBtn').click();
+  await page.locator('#browseInput').fill('Blume');
+  await expect(page.locator('.browseItem').first()).not.toContainText('补过的');
+  await page.locator('#browseClose').click();
+
+  page.on('dialog', (d) => d.accept());
+  await page.evaluate((snap) => {
+    const dt = new DataTransfer();
+    dt.items.add(new File([JSON.stringify(snap)], 'backup.json', { type: 'application/json' }));
+    const input = document.getElementById('fileImport') as HTMLInputElement;
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change'));
+  }, snap);
+  // Opened while the import is still in flight: restoring a backup has to
+  // refresh what is already on screen, not only what is drawn next.
+  await page.locator('#learnBrowseBtn').click();
+  await page.locator('#browseInput').fill('Blume');
+  await expect(page.locator('.browseItem').first()).toContainText('花（补过的）');
+});

@@ -223,12 +223,16 @@
 
     snapshot() {
       return {
-        version: 5,
+        version: 6,
         schema: SCHEMA_VERSION,
         exportedAt: new Date().toISOString(),
         quizProgress: read(QUIZ, {}),
         learnProgress: read(LEARN, {}),
         spellingWrongBook: read(WRONG, {}),
+        // Corrections made inside the app are the learner's work too, and they
+        // are not in the word list they correct — a backup without them loses
+        // every fix on restore.
+        cardPatches: (typeof window !== "undefined" && window.DWPatches) ? window.DWPatches.get() : {},
       };
     },
 
