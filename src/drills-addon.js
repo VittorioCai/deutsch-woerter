@@ -288,7 +288,7 @@ const LDRILLS = [
   { kind: "gender", id: "tabGender", tab: "der / die / das" },
   { kind: "plural", id: "tabPlural", tab: "复数形式" },
   { kind: "conj", id: "tabConj", tab: "动词变位" },
-  { kind: "aux", id: "tabAux", tab: "haben / sein" },
+  { kind: "aux", id: "tabAux", tab: "haben/sein" },
   { kind: "rektion", id: "tabRektion", tab: "介词 + 格" },
   { kind: "cloze", id: "tabCloze", tab: "例句填空" },
   { kind: "dictation", id: "tabDictation", tab: "听写" },
