@@ -21,12 +21,12 @@
 
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshots/01-start.png" alt="Start screen"><br><sub><b>Nothing to set up.</b> One tap loads a built-in 324-word starter deck, or drop in your own CSV.</sub></td>
-<td width="50%"><img src="docs/screenshots/02-home.png" alt="Home screen"><br><sub><b>One button a day.</b> Everything due for review across every chapter, plus a few new words.</sub></td>
+<td width="50%"><img src="docs/screenshots/r2-01-start.png" alt="Start screen"><br><sub><b>Nothing to set up.</b> One tap loads a built-in 324-word starter deck, or drop in your own CSV.</sub></td>
+<td width="50%"><img src="docs/screenshots/r2-02-home.png" alt="Home screen"><br><sub><b>One button a day.</b> Everything due for review across every chapter, plus a few new words.</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="docs/screenshots/08-compound.png" alt="A word explained"><br><sub><b>Why the word is what it is.</b> Gender from the ending, compounds taken apart, plurals derived — computed from the word, for any deck.</sub></td>
-<td width="50%"><img src="docs/screenshots/05-drill.png" alt="Gender drill"><br><sub><b>Drills for what spelling checks miss:</b> der/die/das, plurals, conjugation, haben/sein, preposition + case, cloze, dictation.</sub></td>
+<td width="50%"><img src="docs/screenshots/r2-08-compound.png" alt="A word explained"><br><sub><b>Why the word is what it is.</b> Gender from the ending, compounds taken apart, plurals derived — computed from the word, for any deck.</sub></td>
+<td width="50%"><img src="docs/screenshots/r2-05-drill.png" alt="Gender drill"><br><sub><b>Drills for what spelling checks miss:</b> der/die/das, plurals, conjugation, haben/sein, preposition + case, cloze, dictation.</sub></td>
 </tr>
 </table>
 
