@@ -1,543 +1,543 @@
 {
-  "format": "deutsch-woerter-deck",
-  "version": 1,
-  "name": "Testwortschatz",
-  "cards": [
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "das Haus",
-      "en": "house",
-      "zh": "房子",
-      "grammar": "Plural: Häuser",
-      "example": "Das Haus ist alt."
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "die Tür",
-      "en": "door",
-      "zh": "门",
-      "grammar": "-en"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "der Tisch",
-      "en": "table",
-      "zh": "桌子",
-      "grammar": "-e"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "das Buch",
-      "en": "book",
-      "zh": "书",
-      "grammar": "\"-er"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "der Stuhl",
-      "en": "chair",
-      "zh": "椅子",
-      "grammar": "\"-e"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "die Lampe",
-      "en": "lamp",
-      "zh": "灯",
-      "grammar": "-n"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "das Fenster",
-      "en": "window",
-      "zh": "窗户",
-      "grammar": "-"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "der Garten",
-      "en": "garden",
-      "zh": "花园",
-      "grammar": "\"-"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "die Straße",
-      "en": "street",
-      "zh": "街道",
-      "grammar": "-n"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "das Auto",
-      "en": "car",
-      "zh": "汽车",
-      "grammar": "-s"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "der Wagen",
-      "en": "car",
-      "zh": "汽车",
-      "grammar": "-"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "die Flasche",
-      "en": "bottle",
-      "zh": "瓶子",
-      "grammar": "-n"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "das Wasser",
-      "en": "water",
-      "zh": "水"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "der Apfel",
-      "en": "apple",
-      "zh": "苹果",
-      "grammar": "\"-"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "die Milch",
-      "en": "milk",
-      "zh": "牛奶"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "das Brot",
-      "en": "bread",
-      "zh": "面包",
-      "grammar": "-e"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "der Käse",
-      "en": "cheese",
-      "zh": "奶酪"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "die Butter",
-      "en": "butter",
-      "zh": "黄油"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "das Ei",
-      "en": "egg",
-      "zh": "鸡蛋",
-      "grammar": "-er"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "der Zug",
-      "en": "train",
-      "zh": "火车",
-      "grammar": "\"-e"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "die Stadt",
-      "en": "city",
-      "zh": "城市",
-      "grammar": "\"-e"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "das Kind",
-      "en": "child",
-      "zh": "孩子",
-      "grammar": "-er"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "der Mann",
-      "en": "man",
-      "zh": "男人",
-      "grammar": "\"-er"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "die Frau",
-      "en": "woman",
-      "zh": "女人",
-      "grammar": "-en"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "das Mädchen",
-      "en": "girl",
-      "zh": "女孩",
-      "grammar": "-"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "Deutsch",
-      "en": "German",
-      "zh": "德语"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "Deutsch",
-      "en": "German",
-      "zh": "德语"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "der Hund",
-      "en": "dog",
-      "zh": "狗",
-      "grammar": "-e"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "die Katze",
-      "en": "cat",
-      "zh": "猫",
-      "grammar": "-n"
-    },
-    {
-      "level": "A1",
-      "chapter": "1",
-      "de": "das Pferd",
-      "en": "horse",
-      "zh": "马",
-      "grammar": "-e"
-    },
-    {
-      "level": "A1",
-      "chapter": "2",
-      "de": "der Lehrer",
-      "en": "teacher",
-      "zh": "老师",
-      "grammar": "-"
-    },
-    {
-      "level": "A1",
-      "chapter": "2",
-      "de": "die Schule",
-      "en": "school",
-      "zh": "学校",
-      "grammar": "-n"
-    },
-    {
-      "level": "A1",
-      "chapter": "2",
-      "de": "das Heft",
-      "en": "notebook",
-      "zh": "本子",
-      "grammar": "-e"
-    },
-    {
-      "level": "A1",
-      "chapter": "2",
-      "de": "der Stift",
-      "en": "pen",
-      "zh": "笔",
-      "grammar": "-e"
-    },
-    {
-      "level": "A1",
-      "chapter": "2",
-      "de": "die Tafel",
-      "en": "blackboard",
-      "zh": "黑板",
-      "grammar": "-n"
-    },
-    {
-      "level": "A1",
-      "chapter": "2",
-      "de": "das Wort",
-      "en": "word",
-      "zh": "单词",
-      "grammar": "\"-er"
-    },
-    {
-      "level": "A1",
-      "chapter": "3",
-      "de": "die Arbeit",
-      "en": "work",
-      "zh": "工作",
-      "grammar": "-en"
-    },
-    {
-      "level": "A1",
-      "chapter": "3",
-      "de": "der Beruf",
-      "en": "job",
-      "zh": "职业",
-      "grammar": "-e"
-    },
-    {
-      "level": "A1",
-      "chapter": "3",
-      "de": "das Büro",
-      "en": "office",
-      "zh": "办公室",
-      "grammar": "-s"
-    },
-    {
-      "level": "A1",
-      "chapter": "3",
-      "de": "die Firma",
-      "en": "company",
-      "zh": "公司"
-    },
-    {
-      "level": "A1",
-      "chapter": "3",
-      "de": "der Chef",
-      "en": "boss",
-      "zh": "老板",
-      "grammar": "-s"
-    },
-    {
-      "level": "A1",
-      "chapter": "3",
-      "de": "das Team",
-      "en": "team",
-      "zh": "团队",
-      "grammar": "-s"
-    },
-    {
-      "level": "A2",
-      "chapter": "1",
-      "de": "das Wetter",
-      "en": "weather",
-      "zh": "天气"
-    },
-    {
-      "level": "A2",
-      "chapter": "1",
-      "de": "der Regen",
-      "en": "rain",
-      "zh": "雨"
-    },
-    {
-      "level": "A2",
-      "chapter": "1",
-      "de": "die Sonne",
-      "en": "sun",
-      "zh": "太阳",
-      "grammar": "-n"
-    },
-    {
-      "level": "A2",
-      "chapter": "1",
-      "de": "der Schnee",
-      "en": "snow",
-      "zh": "雪"
-    },
-    {
-      "level": "A2",
-      "chapter": "1",
-      "de": "die Wolke",
-      "en": "cloud",
-      "zh": "云",
-      "grammar": "-n"
-    },
-    {
-      "level": "A2",
-      "chapter": "5",
-      "de": "die Reise",
-      "en": "trip",
-      "zh": "旅行",
-      "grammar": "-n"
-    },
-    {
-      "level": "A2",
-      "chapter": "5",
-      "de": "der Koffer",
-      "en": "suitcase",
-      "zh": "行李箱",
-      "grammar": "-"
-    },
-    {
-      "level": "A2",
-      "chapter": "5",
-      "de": "das Ticket",
-      "en": "ticket",
-      "zh": "车票",
-      "grammar": "-s"
-    },
-    {
-      "level": "A2",
-      "chapter": "5",
-      "de": "der Bahnhof",
-      "en": "station",
-      "zh": "火车站",
-      "grammar": "\"-e"
-    },
-    {
-      "level": "A2",
-      "chapter": "5",
-      "de": "die Fahrkarte",
-      "en": "ticket",
-      "zh": "车票",
-      "grammar": "-n"
-    },
-    {
-      "level": "A1",
-      "chapter": "4",
-      "de": "freuen",
-      "en": "to be pleased",
-      "zh": "（sich auf +A）期待",
-      "grammar": "er freut, hat gefreut",
-      "example": "Ich freue mich auf den Sommer.（我期待夏天。）"
-    },
-    {
-      "level": "A1",
-      "chapter": "4",
-      "de": "gehen",
-      "en": "to go",
-      "zh": "走；去",
-      "grammar": "er geht, ist gegangen",
-      "example": "Wir gehen nach Hause.（我们回家。）"
-    },
-    {
-      "level": "A1",
-      "chapter": "4",
-      "de": "kaufen",
-      "en": "to buy",
-      "zh": "买",
-      "grammar": "er kauft, hat gekauft",
-      "example": "Ich kaufe ein Brot.（我买一个面包。）"
-    },
-    {
-      "level": "A1",
-      "chapter": "4",
-      "de": "die Blume",
-      "en": "flower",
-      "zh": "花",
-      "grammar": "-n",
-      "example": "Die Blume ist schön.（这朵花很美。）"
-    },
-    {
-      "level": "A1",
-      "chapter": "4",
-      "de": "international",
-      "en": "international",
-      "zh": "国际的",
-      "example": "Frankfurt hat einen internationalen Flughafen.（法兰克福有一座国际机场。）"
-    },
-    {
-      "level": "A1",
-      "chapter": "4",
-      "de": "zuordnen",
-      "en": "to match",
-      "zh": "配对",
-      "grammar": "er ordnet zu, hat zugeordnet",
-      "example": "Ordnen Sie die Bilder zu.（请把图片配对。）"
-    },
-    {
-      "level": "A1",
-      "chapter": "4",
-      "de": "gehen",
-      "en": "hier: to be okay",
-      "zh": "这里：进行得顺利",
-      "grammar": "er geht, ist gegangen",
-      "example": "Wie geht es dir?（你怎么样？）"
-    },
-    {
-      "level": "A2",
-      "chapter": "6",
-      "de": "warten",
-      "zh": "等待（auf +A 等某人／某事）",
-      "en": "to wait (auf +A)",
-      "grammar": "er wartet, hat gewartet",
-      "example": "Ich warte auf den Bus.（我在等公交车。）"
-    },
-    {
-      "level": "A2",
-      "chapter": "6",
-      "de": "sprechen",
-      "zh": "说；讲（mit +D 和某人说；über +A 谈论）",
-      "en": "to speak (mit +D, über +A)",
-      "grammar": "er spricht, sprach, hat gesprochen",
-      "example": "Er spricht mit dem Lehrer.（他在和老师说话。）"
-    },
-    {
-      "level": "A2",
-      "chapter": "6",
-      "de": "aus",
-      "zh": "这里：来自（+三格）",
-      "en": "hier: from (+D)"
-    },
-    {
-      "level": "A2",
-      "chapter": "6",
-      "de": "aufstehen",
-      "zh": "起床",
-      "en": "to get up",
-      "grammar": "er steht auf, ist aufgestanden",
-      "example": "Er steht um sieben Uhr auf.（他七点起床。）"
-    },
-    {
-      "level": "A2",
-      "chapter": "6",
-      "de": "nehmen",
-      "zh": "拿；取",
-      "en": "to take",
-      "grammar": "er nimmt, hat genommen",
-      "example": "Sie nimmt den Zug.（她坐火车。）"
-    },
-    {
-      "level": "A2",
-      "chapter": "6",
-      "de": "kochen",
-      "zh": "做饭；煮",
-      "en": "to cook",
-      "grammar": "er kocht, hat gekocht"
-    },
-    {
-      "level": "A2",
-      "chapter": "6",
-      "de": "die Frage",
-      "zh": "问题（nach +D 关于……的问题）",
-      "en": "question (nach +D)",
-      "grammar": "Plural: die Fragen"
-    },
-    {
-      "level": "A1",
-      "chapter": "4",
-      "de": "kommen",
-      "zh": "来",
-      "en": "to come",
-      "grammar": "er kommt, ist gekommen"
-    }
-  ]
+ "format": "deutsch-woerter-deck",
+ "version": 1,
+ "name": "Testwortschatz",
+ "cards": [
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "das Haus",
+   "en": "house",
+   "zh": "房子",
+   "grammar": "Plural: Häuser",
+   "example": "Das Haus ist alt."
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "die Tür",
+   "en": "door",
+   "zh": "门",
+   "grammar": "-en"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "der Tisch",
+   "en": "table",
+   "zh": "桌子",
+   "grammar": "-e"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "das Buch",
+   "en": "book",
+   "zh": "书",
+   "grammar": "\"-er"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "der Stuhl",
+   "en": "chair",
+   "zh": "椅子",
+   "grammar": "\"-e"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "die Lampe",
+   "en": "lamp",
+   "zh": "灯",
+   "grammar": "-n"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "das Fenster",
+   "en": "window",
+   "zh": "窗户",
+   "grammar": "-"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "der Garten",
+   "en": "garden",
+   "zh": "花园",
+   "grammar": "\"-"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "die Straße",
+   "en": "street",
+   "zh": "街道",
+   "grammar": "-n"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "das Auto",
+   "en": "car",
+   "zh": "汽车",
+   "grammar": "-s"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "der Wagen",
+   "en": "car",
+   "zh": "汽车",
+   "grammar": "-"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "die Flasche",
+   "en": "bottle",
+   "zh": "瓶子",
+   "grammar": "-n"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "das Wasser",
+   "en": "water",
+   "zh": "水"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "der Apfel",
+   "en": "apple",
+   "zh": "苹果",
+   "grammar": "\"-"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "die Milch",
+   "en": "milk",
+   "zh": "牛奶"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "das Brot",
+   "en": "bread",
+   "zh": "面包",
+   "grammar": "-e"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "der Käse",
+   "en": "cheese",
+   "zh": "奶酪"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "die Butter",
+   "en": "butter",
+   "zh": "黄油"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "das Ei",
+   "en": "egg",
+   "zh": "鸡蛋",
+   "grammar": "-er"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "der Zug",
+   "en": "train",
+   "zh": "火车",
+   "grammar": "\"-e"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "die Stadt",
+   "en": "city",
+   "zh": "城市",
+   "grammar": "\"-e"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "das Kind",
+   "en": "child",
+   "zh": "孩子",
+   "grammar": "-er"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "der Mann",
+   "en": "man",
+   "zh": "男人",
+   "grammar": "\"-er"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "die Frau",
+   "en": "woman",
+   "zh": "女人",
+   "grammar": "-en"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "das Mädchen",
+   "en": "girl",
+   "zh": "女孩",
+   "grammar": "-"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "Deutsch",
+   "en": "German",
+   "zh": "德语"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "Deutsch",
+   "en": "German",
+   "zh": "德语"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "der Hund",
+   "en": "dog",
+   "zh": "狗",
+   "grammar": "-e"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "die Katze",
+   "en": "cat",
+   "zh": "猫",
+   "grammar": "-n"
+  },
+  {
+   "level": "A1",
+   "chapter": "1",
+   "de": "das Pferd",
+   "en": "horse",
+   "zh": "马",
+   "grammar": "-e"
+  },
+  {
+   "level": "A1",
+   "chapter": "2",
+   "de": "der Lehrer",
+   "en": "teacher",
+   "zh": "老师",
+   "grammar": "-"
+  },
+  {
+   "level": "A1",
+   "chapter": "2",
+   "de": "die Schule",
+   "en": "school",
+   "zh": "学校",
+   "grammar": "-n"
+  },
+  {
+   "level": "A1",
+   "chapter": "2",
+   "de": "das Heft",
+   "en": "notebook",
+   "zh": "本子",
+   "grammar": "-e"
+  },
+  {
+   "level": "A1",
+   "chapter": "2",
+   "de": "der Stift",
+   "en": "pen",
+   "zh": "笔",
+   "grammar": "-e"
+  },
+  {
+   "level": "A1",
+   "chapter": "2",
+   "de": "die Tafel",
+   "en": "blackboard",
+   "zh": "黑板",
+   "grammar": "-n"
+  },
+  {
+   "level": "A1",
+   "chapter": "2",
+   "de": "das Wort",
+   "en": "word",
+   "zh": "单词",
+   "grammar": "\"-er"
+  },
+  {
+   "level": "A1",
+   "chapter": "3",
+   "de": "die Arbeit",
+   "en": "work",
+   "zh": "工作",
+   "grammar": "-en"
+  },
+  {
+   "level": "A1",
+   "chapter": "3",
+   "de": "der Beruf",
+   "en": "job",
+   "zh": "职业",
+   "grammar": "-e"
+  },
+  {
+   "level": "A1",
+   "chapter": "3",
+   "de": "das Büro",
+   "en": "office",
+   "zh": "办公室",
+   "grammar": "-s"
+  },
+  {
+   "level": "A1",
+   "chapter": "3",
+   "de": "die Firma",
+   "en": "company",
+   "zh": "公司"
+  },
+  {
+   "level": "A1",
+   "chapter": "3",
+   "de": "der Chef",
+   "en": "boss",
+   "zh": "老板",
+   "grammar": "-s"
+  },
+  {
+   "level": "A1",
+   "chapter": "3",
+   "de": "das Team",
+   "en": "team",
+   "zh": "团队",
+   "grammar": "-s"
+  },
+  {
+   "level": "A2",
+   "chapter": "1",
+   "de": "das Wetter",
+   "en": "weather",
+   "zh": "天气"
+  },
+  {
+   "level": "A2",
+   "chapter": "1",
+   "de": "der Regen",
+   "en": "rain",
+   "zh": "雨"
+  },
+  {
+   "level": "A2",
+   "chapter": "1",
+   "de": "die Sonne",
+   "en": "sun",
+   "zh": "太阳",
+   "grammar": "-n"
+  },
+  {
+   "level": "A2",
+   "chapter": "1",
+   "de": "der Schnee",
+   "en": "snow",
+   "zh": "雪"
+  },
+  {
+   "level": "A2",
+   "chapter": "1",
+   "de": "die Wolke",
+   "en": "cloud",
+   "zh": "云",
+   "grammar": "-n"
+  },
+  {
+   "level": "A2",
+   "chapter": "5",
+   "de": "die Reise",
+   "en": "trip",
+   "zh": "旅行",
+   "grammar": "-n"
+  },
+  {
+   "level": "A2",
+   "chapter": "5",
+   "de": "der Koffer",
+   "en": "suitcase",
+   "zh": "行李箱",
+   "grammar": "-"
+  },
+  {
+   "level": "A2",
+   "chapter": "5",
+   "de": "das Ticket",
+   "en": "ticket",
+   "zh": "车票",
+   "grammar": "-s"
+  },
+  {
+   "level": "A2",
+   "chapter": "5",
+   "de": "der Bahnhof",
+   "en": "station",
+   "zh": "火车站",
+   "grammar": "\"-e"
+  },
+  {
+   "level": "A2",
+   "chapter": "5",
+   "de": "die Fahrkarte",
+   "en": "ticket",
+   "zh": "车票",
+   "grammar": "-n"
+  },
+  {
+   "level": "A1",
+   "chapter": "4",
+   "de": "freuen",
+   "en": "to be pleased",
+   "zh": "（sich auf +A）期待",
+   "grammar": "er freut, hat gefreut",
+   "example": "Ich freue mich auf den Sommer.（我期待夏天。）"
+  },
+  {
+   "level": "A1",
+   "chapter": "4",
+   "de": "gehen",
+   "en": "to go",
+   "zh": "走；去",
+   "grammar": "er geht, ist gegangen",
+   "example": "Wir gehen nach Hause.（我们回家。）"
+  },
+  {
+   "level": "A1",
+   "chapter": "4",
+   "de": "kaufen",
+   "en": "to buy",
+   "zh": "买",
+   "grammar": "er kauft, hat gekauft",
+   "example": "Ich kaufe ein Brot.（我买一个面包。）"
+  },
+  {
+   "level": "A1",
+   "chapter": "4",
+   "de": "die Blume",
+   "en": "flower",
+   "zh": "花",
+   "grammar": "-n",
+   "example": "Die Blume ist schön.（这朵花很美。）"
+  },
+  {
+   "level": "A1",
+   "chapter": "4",
+   "de": "international",
+   "en": "international",
+   "zh": "国际的",
+   "example": "Frankfurt hat einen internationalen Flughafen.（法兰克福有一座国际机场。）"
+  },
+  {
+   "level": "A1",
+   "chapter": "4",
+   "de": "zuordnen",
+   "en": "to match",
+   "zh": "配对",
+   "grammar": "er ordnet zu, hat zugeordnet",
+   "example": "Ordnen Sie die Bilder zu.（请把图片配对。）"
+  },
+  {
+   "level": "A1",
+   "chapter": "4",
+   "de": "gehen",
+   "en": "hier: to be okay",
+   "zh": "这里：进行得顺利",
+   "grammar": "er geht, ist gegangen",
+   "example": "Wie geht es dir?（你怎么样？）"
+  },
+  {
+   "level": "A2",
+   "chapter": "6",
+   "de": "warten",
+   "zh": "等待（auf +A 等某人／某事）",
+   "en": "to wait (auf +A)",
+   "grammar": "er wartet, hat gewartet",
+   "example": "Ich warte auf den Bus.（我在等公交车。）"
+  },
+  {
+   "level": "A2",
+   "chapter": "6",
+   "de": "sprechen",
+   "zh": "说；讲（mit +D 和某人说；über +A 谈论）",
+   "en": "to speak (mit +D, über +A)",
+   "grammar": "er spricht, sprach, hat gesprochen",
+   "example": "Er spricht mit dem Lehrer.（他在和老师说话。）"
+  },
+  {
+   "level": "A2",
+   "chapter": "6",
+   "de": "aus",
+   "zh": "这里：来自（+三格）",
+   "en": "hier: from (+D)"
+  },
+  {
+   "level": "A2",
+   "chapter": "6",
+   "de": "aufstehen",
+   "zh": "起床",
+   "en": "to get up",
+   "grammar": "er steht auf, ist aufgestanden",
+   "example": "Er steht um sieben Uhr auf.（他七点起床。）"
+  },
+  {
+   "level": "A2",
+   "chapter": "6",
+   "de": "nehmen",
+   "zh": "拿；取",
+   "en": "to take",
+   "grammar": "er nimmt, hat genommen",
+   "example": "Sie nimmt den Zug.（她坐火车。）"
+  },
+  {
+   "level": "A2",
+   "chapter": "6",
+   "de": "kochen",
+   "zh": "做饭；煮",
+   "en": "to cook",
+   "grammar": "er kocht, hat gekocht"
+  },
+  {
+   "level": "A2",
+   "chapter": "6",
+   "de": "die Frage",
+   "zh": "问题（nach +D 关于……的问题）",
+   "en": "question (nach +D)",
+   "grammar": "Plural: die Fragen"
+  },
+  {
+   "level": "A1",
+   "chapter": "4",
+   "de": "kommen",
+   "zh": "来",
+   "en": "to come",
+   "grammar": "er kommt, ist gekommen"
+  }
+ ]
 }
