@@ -43,6 +43,7 @@ test('capture the README screenshots', async ({ page }) => {
     localStorage.setItem('netzwerk_vocab_learning_v1', JSON.stringify(learn));
     localStorage.setItem('netzwerk_vocab_schema', '2');
     localStorage.setItem('netzwerk_vocab_last_backup_at', String(now));
+    localStorage.setItem('netzwerk_vocab_prefs_v1', JSON.stringify({ posLevel: 'A1', posChapter: '5', level: 'A1', chapter: '5' }));
     const quiz: Record<string, unknown> = {};
     ids.slice(100, 118).forEach((id: string) => { quiz[id] = { seen: 4, correct: 2, wrong: 2, mastery: 2, last: now } });
     localStorage.setItem('netzwerk_vocab_progress_pwa_v1', JSON.stringify(quiz));
@@ -81,7 +82,6 @@ test('capture the README screenshots', async ({ page }) => {
 
   await page.goto('/');
   await page.waitForSelector('#homeView');
-  await page.locator('#goLearn').click();
   await page.locator('#learnDrillBtn').click();
   await page.locator('#drillStart').click();
   await page.waitForSelector('.genderGrid button');
