@@ -1446,3 +1446,181 @@ test('the conjugation drill wants er nimmt, not er nehmt', async ({ page }) => {
   }
   expect({ sawStrong, sawSeparable }).toEqual({ sawStrong: true, sawSeparable: true });
 });
+
+// A year of study lives in one browser's localStorage. These cover the part the
+// app can actually do something about: knowing how exposed you are, and putting
+// the file somewhere you will find it again.
+const BACKUP_AT_KEY = 'netzwerk_vocab_last_backup_at';
+const BACKUP_WORK_KEY = 'netzwerk_vocab_last_backup_work';
+
+// A real FileSystemDirectoryHandle cannot be faked through IndexedDB — handles
+// are not structured-cloneable when hand-built — so the meta slot is held in
+// memory and only the write/permission logic is exercised, which is the part
+// this repo wrote.
+const fakeFolder = async (page: Page) =>
+  page.addInitScript(() => {
+    const files: Record<string, string> = {};
+    (window as any).__files = files;
+    const fileHandle = (name: string) => ({
+      kind: 'file',
+      name,
+      async getFile() {
+        if (!(name in files)) throw new Error('not found');
+        return { text: async () => files[name] };
+      },
+      async createWritable() {
+        let buf = '';
+        return { write: async (t: string) => { buf += t; }, close: async () => { files[name] = buf; } };
+      },
+    });
+    const dir: any = {
+      kind: 'directory',
+      name: 'Backups',
+      __perm: 'granted',
+      async queryPermission() { return dir.__perm; },
+      async requestPermission() { dir.__perm = 'granted'; return 'granted'; },
+      async getFileHandle(name: string, opts?: { create?: boolean }) {
+        if (!(name in files) && !(opts && opts.create)) throw new Error('not found');
+        return fileHandle(name);
+      },
+    };
+    (window as any).__dir = dir;
+    (window as any).showDirectoryPicker = async () => dir;
+    const meta = new Map<string, unknown>();
+    (window as any).__meta = meta;
+    let real: any;
+    Object.defineProperty(window, 'DWDeck', {
+      configurable: true,
+      get: () => real,
+      set: (v) => {
+        real = v;
+        if (!v) return;
+        v.getMeta = async (k: string) => meta.get(k);
+        v.putMeta = async (k: string, val: unknown) => { meta.set(k, val); };
+        v.delMeta = async (k: string) => { meta.delete(k); };
+      },
+    });
+  });
+
+const seedProgress = async (page: Page, n: number, opts: { backedUpAt?: number; work?: number } = {}) => {
+  const cards = await deck(page);
+  const ids = cards.slice(0, n).map((c) => c.id);
+  await page.evaluate(([learnKey, schemaKey, atKey, workKey, ids, o]) => {
+    (window as any).DWStore.flush();
+    const learn: Record<string, unknown> = {};
+    for (const id of ids as string[]) {
+      learn[id] = { introduced: true, strength: 3, wrong: 0, hard: 0, last: 1, due: Date.now() + 8.64e7, spellingPass: false, cycles: 2, known: false };
+    }
+    localStorage.setItem(learnKey as string, JSON.stringify(learn));
+    localStorage.setItem(schemaKey as string, '2');
+    const opt = o as { backedUpAt?: number; work?: number };
+    if (opt.backedUpAt !== undefined) localStorage.setItem(atKey as string, String(opt.backedUpAt));
+    if (opt.work !== undefined) localStorage.setItem(workKey as string, String(opt.work));
+  }, [LEARN_KEY, SCHEMA_KEY, BACKUP_AT_KEY, BACKUP_WORK_KEY, ids, opts] as const);
+};
+
+test('the backup panel says how much is only in this browser, not how many days', async ({ page }) => {
+  await open(page);
+  await seedProgress(page, 20);
+  await page.reload();
+  await ready(page);
+
+  await page.locator('#backupBtn').click();
+  await expect(page.locator('.backupRisk')).toContainText('还没有备份过');
+
+  const download = page.waitForEvent('download');
+  await page.locator('#backupExport').click();
+  await download;
+  // Having exported, the panel counts from here: not "0 days" but "nothing new".
+  await expect(page.locator('.backupRisk')).toContainText('上次备份就在今天，之后你又学了 0 个词');
+});
+
+test('a reminder arrives for work done, not only for days elapsed', async ({ page }) => {
+  await open(page);
+  // Backed up an hour ago, then a long session. The old rule was 14 days and
+  // would have said nothing at all.
+  await seedProgress(page, 30, { backedUpAt: Date.now() - 3600_000, work: 0 });
+  await page.reload();
+  await ready(page);
+  await expect(page.locator('.dwNoticeItem.warn')).toContainText('之后你又学了');
+  await expect(page.locator('.dwNoticeItem.warn')).toContainText('0 天');
+});
+
+test('nothing is said when little has changed since the last backup', async ({ page }) => {
+  await open(page);
+  await seedProgress(page, 3, { backedUpAt: Date.now() - 3600_000, work: 0 });
+  await page.reload();
+  await ready(page);
+  await expect(page.locator('.dwNoticeItem.warn')).toHaveCount(0);
+});
+
+test('a chosen folder is written to on every visit, keeping the previous copy', async ({ page }) => {
+  await fakeFolder(page);
+  await open(page);
+  await seedProgress(page, 12);
+  await page.reload();
+  await ready(page);
+
+  await page.locator('#backupBtn').click();
+  await page.locator('#backupPick').click();
+  await expect(page.locator('.backupRisk')).toContainText('自动备份开着');
+
+  const first = await page.evaluate(() => Object.keys((window as any).__files));
+  expect(first).toEqual(['deutsch-woerter-backup.json']);
+  const learnt = await page.evaluate(() => Object.keys(JSON.parse((window as any).__files['deutsch-woerter-backup.json']).learnProgress).length);
+  expect(learnt).toBe(12);
+
+  // More study, then the startup path again. (Driven directly rather than by
+  // reloading: a hand-built handle cannot survive one, since addInitScript
+  // rebuilds the fake from scratch.) The backup updates by itself, and the copy
+  // it replaces is kept — overwriting the only copy is when a backup can destroy
+  // what it exists to protect.
+  await seedProgress(page, 25);
+  await page.evaluate(() => (window as any).DWStore.backupReminder());
+  await expect.poll(() => page.evaluate(() => Object.keys((window as any).__files).sort())).toEqual(
+    ['deutsch-woerter-backup-previous.json', 'deutsch-woerter-backup.json'],
+  );
+  const now = await page.evaluate(() => ({
+    latest: Object.keys(JSON.parse((window as any).__files['deutsch-woerter-backup.json']).learnProgress).length,
+    previous: Object.keys(JSON.parse((window as any).__files['deutsch-woerter-backup-previous.json']).learnProgress).length,
+  }));
+  expect(now).toEqual({ latest: 25, previous: 12 });
+});
+
+test('a folder whose permission lapsed asks for it back instead of failing quietly', async ({ page }) => {
+  await fakeFolder(page);
+  await open(page);
+  await seedProgress(page, 12);
+  await page.reload();
+  await ready(page);
+  await page.locator('#backupBtn').click();
+  await page.locator('#backupPick').click();
+  await page.locator('#backupClose').click();
+
+  // Chromium drops the grant between sessions; re-asking needs a click.
+  await page.evaluate(() => { (window as any).__dir.__perm = 'prompt'; });
+  await seedProgress(page, 25);
+  await page.evaluate(() => (window as any).DWStore.backupReminder());
+  await expect(page.locator('.dwNoticeItem.warn')).toContainText('需要你再授权一次');
+  await page.locator('.dwNoticeItem.warn button', { hasText: '恢复自动备份' }).click();
+  await expect.poll(() => page.evaluate(() => Object.keys(JSON.parse((window as any).__files['deutsch-woerter-backup.json']).learnProgress).length)).toBe(25);
+});
+
+test('a phone is offered the share sheet, which is how a file reaches iCloud', async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as any).__shared = [];
+    (navigator as any).canShare = (d: any) => !!(d && d.files && d.files.length);
+    (navigator as any).share = async (d: any) => { (window as any).__shared.push(d.files.map((f: File) => f.name)); };
+    delete (window as any).showDirectoryPicker;
+  });
+  await open(page);
+  await seedProgress(page, 12);
+  await page.reload();
+  await ready(page);
+  await page.locator('#backupBtn').click();
+  // No folder picker on this device, so the panel says so instead of offering it.
+  await expect(page.locator('.backupWay.off')).toContainText('这个浏览器不支持');
+  await page.locator('#backupShare').click();
+  await expect.poll(() => page.evaluate(() => (window as any).__shared)).toEqual([['deutsch-woerter-backup.json']]);
+  await expect(page.locator('.backupRisk')).toContainText('上次备份就在今天');
+});

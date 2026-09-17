@@ -57,13 +57,14 @@ npm run verify                    # tsc + vitest + build + playwright，CI 跑�
 | --- | --- |
 | `src/learn.core.js` | 背词模式：今日任务、三层学习、拼写、SRS、发音 |
 | `src/index.html` | 单词检测模式（独立的一套进度模型） |
-| `src/store.js` | localStorage 全部读写、迁移、备份提醒 |
+| `src/store.js` | localStorage 全部读写、迁移、备份（含自动写文件夹） |
 | `src/deck.js` | 词库解析、卡片 id、IndexedDB |
 | `src/insight.js` | 巧记规则表（性别/复合词/前缀，当场算） |
 | `src/drills-addon.js` | 专项训练：性别、复数、动词变位、haben/sein、介词+格、例句填空、听写 |
 | `src/wrongbook-addon.js` | 拼写错题本 + 错因分析 |
 | `src/mastered-addon.js` | 已掌握档案 |
 | `src/browse-addon.js` | 查词 + 章节地图 + 「学到哪了」的位置 |
+| `src/backup-addon.js` | 备份面板（文件夹 / 分享 / 下载） |
 
 ---
 
@@ -234,10 +235,23 @@ npm run verify                    # tsc + vitest + build + playwright，CI 跑�
 
 ## P4 · 本地优先的代价
 
-**12. 备份提醒太弱。** `store.js` 的 `backupReminder()`：14 天 + ≥50 词才提醒。
-一年的学习记录只存在一个浏览器的 localStorage 里，风险和产品承诺不匹配。不加服务器也能做：
-按"上次备份以来新增了多少进度"触发；或用 File System Access API 让用户选一个文件夹自动写备份
-（选 iCloud/Drive 文件夹就等于同步了）。
+**12. 备份提醒太弱。**　✅ **已修**
+提醒改成按**「上次备份以来新增了多少学习量」**触发（`workUnits()`，只增不减：
+每个学过的词算 1 + 完成轮数 + 已掌握加 1），时间和学习量**任一**达标就提醒。
+原来的规则是 14 天 + ≥50 词，一周学 400 个词的人一句话都收不到。
+提醒的措辞也换了：不说「14 天」，说「上次备份之后你又学了 213 个词」。
+
+备份的去处按设备能力给，而不是只有一个下载按钮（新增 `src/backup-addon.js` 的面板）：
+- **电脑版 Chrome / Edge**：`showDirectoryPicker` 选一个文件夹，**每次打开应用自动写一份**。
+  选 iCloud / Google 云端硬盘的文件夹就等于同步到云上，这里不需要服务器也不需要账号。
+  句柄存在 IndexedDB（`DWDeck.getMeta/putMeta`，localStorage 存不了句柄）
+- **手机**：`navigator.share` 打开系统分享菜单——这是文件在手机上进 iCloud 的实际路径
+- **其他**：照旧下载
+
+两个细节：
+- **永远写两个文件**：覆盖唯一一份副本，正是备份可能毁掉它要保护的东西的时刻。
+  先把旧的复制成 `-previous.json` 再写新的
+- Chromium 重启后会掉权限，重新授权需要用户手势，所以那条通知本身就是那个手势
 
 **13. 词条本身不能改。** 校对、补释义、补例句目前只能在应用外做。
 一个"编辑此词条"、把改动作为**按 id 的补丁层**存进 IndexedDB（重新导入词库也不丢），

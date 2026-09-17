@@ -248,7 +248,17 @@ const DWDeck = (() => {
 
   const clear = () => tx("readwrite", (s) => s.delete(KEY));
 
-  return { parse, serialize, load, save, clear, sha256Hex, idFor, withIds, COLUMNS, FORMAT };
+  // A few things that are neither deck nor progress need to outlive a reload and
+  // cannot go in localStorage because they are not strings — a directory handle
+  // from the File System Access API, above all. They share the deck's database
+  // rather than opening a second one, under a prefixed key so they can never
+  // collide with the deck record itself.
+  const metaKey = (k) => `meta:${k}`;
+  const getMeta = (k) => tx("readonly", (s) => s.get(metaKey(k)));
+  const putMeta = (k, v) => tx("readwrite", (s) => s.put(v, metaKey(k)));
+  const delMeta = (k) => tx("readwrite", (s) => s.delete(metaKey(k)));
+
+  return { parse, serialize, load, save, clear, getMeta, putMeta, delMeta, sha256Hex, idFor, withIds, COLUMNS, FORMAT };
 })();
 
 // A top-level const in a classic script is a lexical binding, not a window

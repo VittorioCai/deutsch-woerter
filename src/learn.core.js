@@ -310,4 +310,4 @@ function Lopener(){let q;try{q=new URLSearchParams(location.search)}catch(e){ret
   if(q.get("mastered")==="1"){Lshow("learn");if(typeof LopenMastered==="function")LopenMastered();return}
   if(q.get("wrong")==="1"){Lshow("learn");if(typeof LopenWrongBook==="function")LopenWrongBook();return}
   if(view==="learn"||view==="quiz")Lshow(view)}
-function Lboot(){LbuildShell();LinitWrongBookUI();LinitMasteredUI();LinitDrillUI();LinitBrowseUI();Lready()}
+function Lboot(){LbuildShell();LinitWrongBookUI();LinitMasteredUI();LinitDrillUI();LinitBrowseUI();LinitBackupUI();Lready()}
