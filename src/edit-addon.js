@@ -91,6 +91,7 @@ function LcardsChanged(ids) {
     if (c.zh) ZH[c.id] = c.zh; else delete ZH[c.id];
   }
   if (typeof LbrowseHays !== "undefined") { if (all) LbrowseHays.clear(); else ids.forEach((id) => LbrowseHays.delete(id)) }
+  if (typeof DWInsight !== "undefined" && DWInsight.Lforget) DWInsight.Lforget();
   if (typeof LrektionCache !== "undefined") {
     if (all) LrektionCache.clear(); else ids.forEach((id) => LrektionCache.delete(id));
     LrektionPoolCache = null;

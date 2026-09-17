@@ -401,7 +401,8 @@ describe('what the grammar and example columns encode', () => {
     LclozeSpan(c: Card): Span | null;
     LclozeAccepted(c: Card, span: Span, input: string): boolean;
   }>('drills-addon.js', '{ LauxOf, LclozeSpan, LclozeAccepted }',
-    { DWStore: DWStoreStub, document: documentStub, LexampleDe: learn.LexampleDe, Lnorm: learn.Lnorm });
+    { DWStore: DWStoreStub, document: documentStub, LexampleDe: learn.LexampleDe, Lnorm: learn.Lnorm,
+      DWInsight: load<any>('insight.js', 'DWInsight') });
 
   describe('reflexive verbs', () => {
     // `sich` is shown in the meaning column and nowhere else, so scoring against
@@ -835,7 +836,7 @@ describe('the two things a Chinese gloss cannot tell you', () => {
     'learn.core.js', '{ Lnorm, LsenseFree, Lmeaning, Lenglish, LhasZh, Lshuffle }', { DWStore: DWStoreStub, document: documentStub });
 
   type Rek = { kind: 'prep'; combos: Array<{ prep: string; kase: string }> } | { kind: 'case'; cases: string[]; isPrep: boolean } | null;
-  type Conj = { inf: string; present: string; past: string; perfect: string; separable: boolean; regular: boolean } | null;
+  type Conj = { inf: string; present: string; past: string; perfect: string; aux: string; participle: string; separable: boolean; regular: boolean; multiword: boolean } | null;
   const drillsOver = (cards: Card[]) => load<{
     LrektionOf(c: Card): Rek;
     LrektionHint(c: Card): string;
@@ -848,6 +849,7 @@ describe('the two things a Chinese gloss cannot tell you', () => {
   }>('drills-addon.js',
     '{ LrektionOf, LrektionHint, LrektionAccepted, LrektionOptions, LrektionCombos, LconjOf, LconjAsk, LconjAccepted }',
     { DWStore: DWStoreStub, document: documentStub, CARDS: cards, Lnorm: learn.Lnorm, LsenseFree: learn.LsenseFree,
+      DWInsight: load<any>('insight.js', 'DWInsight'),
       Lenglish: learn.Lenglish, Lshuffle: learn.Lshuffle,
       // In the app the Chinese lives in a ZH map keyed by id, filled from c.zh
       // at boot; here it is read off the card, which is the same value.
@@ -917,7 +919,12 @@ describe('the two things a Chinese gloss cannot tell you', () => {
     const d = drillsOver([nehmen, aufstehen, kochen, sprechen]);
 
     it('marks the stem change that nobody warns you about', () => {
-      expect(d.LconjOf(nehmen)).toEqual({ inf: 'nehmen', present: 'nimmt', past: '', perfect: 'hat genommen', separable: false, regular: false });
+      // One reading of the column serves the drills and the explanations alike,
+      // so the auxiliary and the participle come out of the same call.
+      expect(d.LconjOf(nehmen)).toEqual({
+        inf: 'nehmen', present: 'nimmt', past: '', perfect: 'hat genommen',
+        aux: 'haben', participle: 'genommen', separable: false, regular: false, multiword: false,
+      });
       expect(d.LconjOf(kochen)!.regular).toBe(true);
     });
 
@@ -953,6 +960,117 @@ describe('the two things a Chinese gloss cannot tell you', () => {
       const dd = drillsOver([spazieren, plural]);
       expect(dd.LconjOf(spazieren)).toBe(null);
       expect(dd.LconjOf(plural)).toBe(null);
+    });
+  });
+});
+
+// bleiben–blieb–geblieben and schreiben–schrieb–geschrieben are one pattern, not
+// two facts. The class comes off the three forms the deck already carries, so it
+// costs nothing per word — but a pattern read wrongly is worse than none.
+describe('why a verb changes the way it does', () => {
+  const DWInsight = load<any>('insight.js', 'DWInsight');
+  type Card = { de: string; zh?: string; en?: string; grammar?: string; level?: string; chapter?: string };
+  const verb = (de: string, grammar: string, zh = de, level = 'A1', chapter = '1'): Card =>
+    ({ de, zh, en: de, grammar, level, chapter });
+  const STRONG: Card[] = [
+    verb('bleiben', 'er bleibt, blieb, ist geblieben'),
+    verb('schreiben', 'er schreibt, schrieb, hat geschrieben'),
+    verb('scheinen', 'er scheint, schien, hat geschienen'),
+    verb('beschreiben', 'er beschreibt, beschrieb, hat beschrieben'),
+    verb('nehmen', 'er nimmt, nahm, hat genommen'),
+    verb('sprechen', 'er spricht, sprach, hat gesprochen'),
+    verb('treffen', 'er trifft, traf, hat getroffen'),
+    verb('gehen', 'er geht, ging, ist gegangen'),
+    verb('kaufen', 'er kauft, hat gekauft'),
+  ];
+
+  it('reads the class off the three forms, prefix and all', () => {
+    // verschreiben's first vowel is the e of ver-; the stem vowel is what the
+    // class is about.
+    expect(DWInsight.LablautClass(STRONG[0])).toBe('ei–ie–ie');
+    expect(DWInsight.LablautClass(STRONG[3])).toBe('ei–ie–ie');
+    expect(DWInsight.LablautClass(STRONG[4])).toBe('e–a–o');
+    expect(DWInsight.LablautClass(STRONG[7])).toBe('e–i–a');
+  });
+
+  it('shows the other verbs that change the same way', () => {
+    const ab = DWInsight.Lablaut(STRONG[0], STRONG);
+    expect(ab.label).toBe('ei → ie → ie');
+    expect(ab.family).toEqual(['schreiben', 'scheinen', 'beschreiben']);
+  });
+
+  it('says nothing about a verb with no Präteritum to compare', () => {
+    // A1 and A2 entries carry two forms, not three. There is no class to read.
+    expect(DWInsight.LablautClass(STRONG[8])).toBe(null);
+    expect(DWInsight.Lablaut(STRONG[8], STRONG)).toBe(null);
+  });
+
+  it('refuses a triple that is not a class German has', () => {
+    // Which is also what catches a stem vowel read wrongly: an invented class
+    // would otherwise look exactly like a real finding.
+    expect(DWInsight.LablautClass(verb('quaxen', 'er quaxt, quox, hat gequuxen'))).toBe(null);
+  });
+
+  it('needs a family before it calls something a pattern', () => {
+    const lonely = [verb('nehmen', 'er nimmt, nahm, hat genommen'), verb('kaufen', 'er kauft, hat gekauft')];
+    expect(DWInsight.Lablaut(lonely[0], lonely)).toBe(null);
+  });
+
+  describe('haben or sein', () => {
+    // "sein means motion" explains 89% of this deck's ist-verbs and misfires on
+    // eight hat-verbs, which is below the bar for stating a rule. Nothing here
+    // predicts the auxiliary: it names the group only once the card has said ist.
+    const MOVERS: Card[] = [
+      verb('gehen', 'er geht, ging, ist gegangen'),
+      verb('kommen', 'er kommt, kam, ist gekommen'),
+      verb('fahren', 'er fährt, fuhr, ist gefahren'),
+      verb('anziehen', 'er zieht an, zog an, hat angezogen'),
+    ];
+
+    it('explains the sein a card has already declared', () => {
+      const se = DWInsight.Lsein(MOVERS[0], MOVERS);
+      expect(se.participle).toBe('gegangen');
+      expect(se.family).toEqual(['kommen → ist gekommen', 'fahren → ist gefahren']);
+    });
+
+    it('stays silent on a haben verb, however much it looks like motion', () => {
+      // anziehen is the ziehen family splitting: transitive takes haben.
+      expect(DWInsight.Lsein(MOVERS[3], MOVERS)).toBe(null);
+      expect(DWInsight.Lanalyse(MOVERS[3], MOVERS).some((r: any) => r.kind === 'aux')).toBe(false);
+    });
+  });
+
+  describe('one word, two entries', () => {
+    const SPLIT: Card[] = [
+      { de: 'der Rock', zh: '裙子', level: 'A1', chapter: '3' },
+      { de: 'der Rock', zh: '摇滚乐', level: 'A2', chapter: '12' },
+      { de: 'der Gefallen', zh: '人情；帮忙', level: 'B1', chapter: '2' },
+      { de: 'das Gefallen', zh: '喜爱', level: 'B1', chapter: '7' },
+      { de: 'gut', zh: '这里：好的；没问题', level: 'A1', chapter: '4' },
+      { de: 'gut', zh: '好；好地', level: 'A1', chapter: '1' },
+    ];
+
+    it('points at the other sense instead of leaving two right answers around', () => {
+      const s = DWInsight.Lsenses(SPLIT[0], SPLIT);
+      expect(s).toEqual([{ art: 'der', sense: '摇滚乐', where: 'A2 K12', gendered: false }]);
+    });
+
+    it('calls out the pair that differs only by its article', () => {
+      const s = DWInsight.Lsenses(SPLIT[2], SPLIT);
+      expect(s[0].gendered).toBe(true);
+      const row = DWInsight.Lanalyse(SPLIT[2], SPLIT).find((r: any) => r.kind === 'senses');
+      expect(row.label).toBe('换个性别就换个意思');
+      expect(row.text).toContain('das Gefallen = 喜爱');
+    });
+
+    it('strips the 这里： note before comparing, and before showing', () => {
+      const s = DWInsight.Lsenses(SPLIT[5], SPLIT);
+      expect(s).toEqual([{ art: '', sense: '好的；没问题', where: 'A1 K4', gendered: false }]);
+    });
+
+    it('says nothing when the same word is listed twice with the same meaning', () => {
+      const same = [{ de: 'die Tür', zh: '门', level: 'A1', chapter: '1' }, { de: 'die Tür', zh: '门', level: 'A2', chapter: '3' }];
+      expect(DWInsight.Lsenses(same[0], same)).toEqual([]);
     });
   });
 });

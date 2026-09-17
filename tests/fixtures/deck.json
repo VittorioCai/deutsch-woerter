@@ -530,6 +530,14 @@
       "zh": "问题（nach +D 关于……的问题）",
       "en": "question (nach +D)",
       "grammar": "Plural: die Fragen"
+    },
+    {
+      "level": "A1",
+      "chapter": "4",
+      "de": "kommen",
+      "zh": "来",
+      "en": "to come",
+      "grammar": "er kommt, ist gekommen"
     }
   ]
 }

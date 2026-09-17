@@ -71,9 +71,11 @@ function LpluralAlts(c) {
 // gegangen" lands wrong the way a scrambled sentence does. Guessing is weak cover
 // too: unlike der/die/das there are only two answers, so knowing beats guessing
 // within a round.
+// The word-form column is read in exactly one place (DWInsight.Lforms) so the
+// drills and the explanations can never disagree about what it says.
 function LauxOf(c) {
-  const m = (c.grammar || "").trim().match(/,\s*(hat|ist)\s+(\S.*)$/);
-  return m ? { aux: m[1] === "hat" ? "haben" : "sein", part: m[2].trim() } : null;
+  const f = DWInsight.Lforms(c);
+  return f && f.aux ? { aux: f.aux, part: f.participle } : null;
 }
 const LauxCards = () => CARDS.filter(c => !Lmastered(Lstate(c)) && LauxOf(c));
 
@@ -217,25 +219,11 @@ const LrektionAccepted = (c, picked) => {
 // instead — `aufstehen` is `er steht auf`, with the prefix thrown to the end of
 // the clause. Both are written out in the word-form column and neither has ever
 // been asked; the auxiliary drill only ever showed the participle.
+// A multi-word headword (spazieren gehen, los sein) has no single form to ask
+// for, so it gets no question rather than one about half of it.
 function LconjOf(c) {
-  const g = (c.grammar || "").trim();
-  if (!/^er\s/i.test(g)) return null;
-  const inf = c.de.trim();
-  if (/[\s|/]/.test(inf)) return null;
-  const parts = g.split(/\s*,\s*/).map((x) => x.trim()).filter(Boolean);
-  if (parts.length < 2 || parts.length > 3) return null;
-  const present = parts[0].replace(/^er\s+/i, "").trim();
-  if (!present) return null;
-  const stem = inf.replace(/e?n$/, "");
-  return {
-    inf, present,
-    past: parts.length === 3 ? parts[1] : "",
-    perfect: parts[parts.length - 1],
-    separable: /\s/.test(present),
-    // Worth flagging in the feedback: a vowel change is the thing to remember,
-    // an -t ending is not.
-    regular: present === `${stem}t` || present === `${stem}et`,
-  };
+  const f = DWInsight.Lforms(c);
+  return f && !f.multiword ? f : null;
 }
 const LconjCards = () => CARDS.filter((c) => !Lmastered(Lstate(c)) && LconjOf(c));
 // Alternating by position rather than at random keeps a round predictable and a

@@ -1223,6 +1223,10 @@ test('an explanation never argues with the word it explains', async ({ page }) =
     for (const c of cards) {
       for (const row of (window as any).DWInsight.Lanalyse(c, cards)) {
         if (row.kind === 'gender' && !row.label.includes(c.de.split(' ')[0])) out.push(`${c.de}: ${row.label}`);
+        // Same bar for the auxiliary: "sein 那一类" under a hat-verb would be
+        // teaching Ich habe gegangen. The rule only ever explains what the card
+        // has already said, so it cannot get this wrong — this is the guard.
+        if (row.kind === 'aux' && !/,\s*ist\s/.test(c.grammar || '')) out.push(`${c.de}: ${row.label}`);
       }
     }
     return out;
@@ -1895,4 +1899,52 @@ test('a round of 单词检测 starts with what the schedule wants today', async 
   }
   const dueEn = due.map((c) => c.en.replace(/^[_\-–—\s]+/, '').trim());
   expect(seen.sort()).toEqual(dueEn.sort());
+});
+
+test('a verb is explained by the pattern it belongs to, not as three separate facts', async ({ page }) => {
+  await open(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#learnBrowseBtn').click();
+  await page.locator('#browseInput').fill('gehen');
+  await page.locator('#browseClose').click();
+
+  await page.selectOption('#learnLevel', 'A1');
+  await page.selectOption('#learnChapter', '4');
+  await page.selectOption('#learnCount', '10');
+  await page.locator('#learnStartBtn').click();
+
+  // gehen ships with ist gegangen. The panel may name the sein group — it is
+  // only ever explaining what the card itself has already said.
+  for (let i = 0; i < 10; i++) {
+    const word = (await page.locator('#learnBody .learnWord').first().textContent())!.trim();
+    if (word === 'gehen') {
+      await expect(page.locator('.insightBox')).toContainText('完成时用 sein');
+      await expect(page.locator('.insightBox')).toContainText('ist gegangen');
+      return;
+    }
+    await page.locator('#learnRemember').click();
+  }
+  throw new Error('gehen never came up');
+});
+
+test('the other sense of a word is shown, not only kept out of the wrong answers', async ({ page }) => {
+  await open(page);
+  // The fixture lists gehen twice in A1 Kapitel 4: 走；去 and 这里：进行得顺利.
+  await page.locator('#goLearn').click();
+  await page.selectOption('#learnLevel', 'A1');
+  await page.selectOption('#learnChapter', '4');
+  await page.selectOption('#learnCount', '10');
+  await page.locator('#learnStartBtn').click();
+  for (let i = 0; i < 10; i++) {
+    const word = (await page.locator('#learnBody .learnWord').first().textContent())!.trim();
+    if (word === 'gehen') {
+      const box = page.locator('.insightBox');
+      await expect(box).toContainText('同一个词的别的意思');
+      // Shown without the chapter note that would have given a quiz away.
+      await expect(box).not.toContainText('这里：');
+      return;
+    }
+    await page.locator('#learnRemember').click();
+  }
+  throw new Error('gehen never came up');
 });
