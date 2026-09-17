@@ -21,7 +21,7 @@
 
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshots/01-start.png" alt="Start screen"><br><sub><b>Nothing to set up.</b> One tap loads a built-in 284-word starter deck, or drop in your own CSV.</sub></td>
+<td width="50%"><img src="docs/screenshots/01-start.png" alt="Start screen"><br><sub><b>Nothing to set up.</b> One tap loads a built-in 324-word starter deck, or drop in your own CSV.</sub></td>
 <td width="50%"><img src="docs/screenshots/02-home.png" alt="Home screen"><br><sub><b>One button a day.</b> Everything due for review across every chapter, plus a few new words.</sub></td>
 </tr>
 <tr>
@@ -38,7 +38,7 @@ This one inverts that: **you bring the words, it stays on your device, and the c
 is yours to read.**
 
 That is also why it ships with no textbook vocabulary. Publishing an app is not a
-licence to redistribute somebody's glossary. What it does ship is a 284-word
+licence to redistribute somebody's glossary. What it does ship is a 324-word
 starter deck written for this project, so the app is useful the second you open it.
 
 ## What it does
@@ -55,6 +55,9 @@ starter deck written for this project, so the app is useful the second you open 
   for a recognition-only session; those words still advance through the review
   intervals but cannot reach 已掌握, which here means *you can produce the word*,
   not just recognise it.
+- **Mistakes are settled in the round.** A missed question is asked again before
+  the round ends, the way a teacher would, and the word comes back tomorrow at the
+  earliest — nothing piles up on the home screen as a debt of ten-minute reviews.
 - **单词检测 — the quiz.** Weak words first, both directions, spelling checked,
   articles optional or strict. It keeps **one book with 学新词**: answering here
   pushes that word's next review out, missing it drops the word back into the
