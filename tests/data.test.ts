@@ -392,7 +392,8 @@ describe('what the grammar and example columns encode', () => {
     LexampleDe(c: Card): string;
     LexampleZh(c: Card): string;
     Lnorm(s: string): string;
-  }>('learn.core.js', '{ LspellAccepted, LisReflexive, LexampleDe, LexampleZh, Lnorm }',
+    Lvariants(de: string): string[];
+  }>('learn.core.js', '{ LspellAccepted, LisReflexive, LexampleDe, LexampleZh, Lnorm, Lvariants }',
     { DWStore: DWStoreStub, document: documentStub });
 
   type Span = { before: string; word: string; after: string };
@@ -400,9 +401,56 @@ describe('what the grammar and example columns encode', () => {
     LauxOf(c: Card): { aux: string; part: string } | null;
     LclozeSpan(c: Card): Span | null;
     LclozeAccepted(c: Card, span: Span, input: string): boolean;
-  }>('drills-addon.js', '{ LauxOf, LclozeSpan, LclozeAccepted }',
+    LdrillArticles(c: Card): string[];
+  }>('drills-addon.js', '{ LauxOf, LclozeSpan, LclozeAccepted, LdrillArticles }',
     { DWStore: DWStoreStub, document: documentStub, LexampleDe: learn.LexampleDe, Lnorm: learn.Lnorm,
       DWInsight: load<any>('insight.js', 'DWInsight') });
+
+  // A word list writes alternatives with a slash, and the app used to demand the
+  // slash back: der/die Deutsche was only "right" when typed with both articles,
+  // and even the bare noun was refused, because a headword starting "der/" was
+  // not recognised as a noun at all. 39 entries of the 5434-word deck are like
+  // this, most of them nominalised adjectives naming people.
+  describe('a headword that offers two forms', () => {
+    const deutsche: Card = { de: 'der/die Deutsche', zh: '德国人' };
+    const joghurt: Card = { de: 'der/das Joghurt', zh: '酸奶' };
+
+    it('takes either article, or none', () => {
+      for (const typed of ['der Deutsche', 'die Deutsche', 'Deutsche', 'der/die Deutsche']) {
+        expect(learn.LspellAccepted(deutsche, typed), typed).toBe(true);
+      }
+      expect(learn.LspellAccepted(joghurt, 'das Joghurt')).toBe(true);
+      expect(learn.LspellAccepted(deutsche, 'der Deutscher')).toBe(false);
+    });
+
+    it('takes either spelling when the alternatives are not articles', () => {
+      const dizzy: Card = { de: 'schwindelig/schwindlig', zh: '头晕的' };
+      expect(learn.LspellAccepted(dizzy, 'schwindlig')).toBe(true);
+      expect(learn.LspellAccepted(dizzy, 'schwindelig')).toBe(true);
+      const plum: Card = { de: 'die Zwetschge/Zwetschke', zh: '洋李' };
+      expect(learn.LspellAccepted(plum, 'die Zwetschge')).toBe(true);
+      expect(learn.LspellAccepted(plum, 'Zwetschke')).toBe(true);
+    });
+
+    // A slash against a hyphen is a shortened compound, not a choice: the whole
+    // word is die Ja-/Nein-Frage, and "die Ja-" is not a word.
+    it('does not split a shortened compound into words that do not exist', () => {
+      const question: Card = { de: 'die Ja-/Nein-Frage', zh: '一般疑问句' };
+      expect(learn.Lvariants(question.de)).toEqual(['die Ja-/Nein-Frage']);
+      expect(learn.LspellAccepted(question, 'die Ja-/Nein-Frage')).toBe(true);
+      expect(learn.LspellAccepted(question, 'die Ja-')).toBe(false);
+      expect(learn.LspellAccepted(question, 'Nein-Frage')).toBe(false);
+    });
+
+    it('offers each article to the der/die/das drill, so neither is marked wrong', () => {
+      expect(drills.LdrillArticles(deutsche)).toEqual(['der', 'die']);
+      expect(drills.LdrillArticles(joghurt)).toEqual(['der', 'das']);
+      expect(drills.LdrillArticles({ de: 'das Haus' })).toEqual(['das']);
+      // the drill is about nouns; a pronoun listing its three forms is not one
+      expect(drills.LdrillArticles({ de: 'derselbe / dieselbe / dasselbe' })).toEqual([]);
+      expect(drills.LdrillArticles({ de: 'die Ja-/Nein-Frage' })).toEqual(['die']);
+    });
+  });
 
   describe('reflexive verbs', () => {
     // `sich` is shown in the meaning column and nowhere else, so scoring against

@@ -15,7 +15,14 @@ function LdrillSave(id, kind, correct) {
   DWStore.queue(DRILL_KEY, () => drillProgress);
 }
 
-const LdrillArticle = c => (c.de.match(/^(der|die|das)\b/i) || [])[1]?.toLowerCase() || "";
+// A noun can carry two articles, and then both buttons are right: der/die
+// Deutsche follows the person it names, der/das Joghurt is simply both. Marking
+// one of them wrong teaches the learner something untrue.
+const LdrillArticles = c => {
+  const m = String(c.de || "").match(/^(der|die|das)((?:\s*\/\s*(?:der|die|das))*)\b/i);
+  return m ? (m[1] + m[2]).split("/").map(s => s.trim().toLowerCase()) : [];
+};
+const LdrillArticle = c => LdrillArticles(c)[0] || "";
 const LdrillStem = c => c.de.replace(/^(der|die|das)\s+/i, "").trim();
 const LdrillNouns = () => CARDS.filter(c => LdrillArticle(c) && !Lmastered(Lstate(c)));
 
@@ -322,7 +329,7 @@ function LdrillRow(label, total, stat) {
 }
 function LdrillBreakdown() {
   if (drillKind === "gender") return ["der", "die", "das"]
-    .map(a => LdrillRow(a, LdrillNouns().filter(c => LdrillArticle(c) === a).length, LdrillAccuracy("gender", c => LdrillArticle(c) === a))).join("");
+    .map(a => LdrillRow(a, LdrillNouns().filter(c => LdrillArticles(c).includes(a)).length, LdrillAccuracy("gender", c => LdrillArticles(c).includes(a)))).join("");
   if (drillKind === "aux") return ["haben", "sein"]
     .map(a => LdrillRow(a, LauxCards().filter(c => LauxOf(c).aux === a).length, LdrillAccuracy("aux", c => LauxOf(c).aux === a))).join("");
   if (drillKind === "rektion") return [["搭配（词 + 介词 + 格）", "prep"], ["介词支配的格", "case"]]
@@ -426,16 +433,16 @@ function LdrillNext(ok, correctHTML) {
 function LanswerGender(c, picked) {
   if (drillAnswered) return;
   drillAnswered = true;
-  const right = LdrillArticle(c), ok = picked === right;
+  const rights = LdrillArticles(c), ok = rights.includes(picked);
   if (ok) drillScore++;
   LdrillSave(c.id, "gender", ok);
   document.querySelectorAll("#drillContent .genderGrid button").forEach(b => {
     b.disabled = true;
-    if (b.dataset.a === right) b.classList.add("correct");
+    if (rights.includes(b.dataset.a)) b.classList.add("correct");
     else if (b.dataset.a === picked) b.classList.add("wrong");
   });
   const pl = LpluralOf(c);
-  LdrillNext(ok, `<div class="answerRow"><div class="deAnswer">${Lesc(c.de)}</div>${LspeakBtn(c.de)}</div>${pl ? `<div class="meta">复数：${Lesc(pl)} ${LspeakBtn(pl)}</div>` : ""}`);
+  LdrillNext(ok, `<div class="answerRow"><div class="deAnswer">${Lesc(c.de)}</div>${LspeakBtn(c.de)}</div>${rights.length > 1 ? `<div class="meta">${rights.join(" 和 ")} 都算对。</div>` : ""}${pl ? `<div class="meta">复数：${Lesc(pl)} ${LspeakBtn(pl)}</div>` : ""}`);
 }
 function LanswerDictation(c, show) {
   if (drillAnswered) return;
