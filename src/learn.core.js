@@ -7,12 +7,28 @@ const L$=id=>document.getElementById(id);
 const Lesc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]));
 const Lnorm=s=>(s||"").toLowerCase().trim().replace(/[|·.,;:!?()[\]{}“”„"']/g," ").replace(/\s+/g," ").replace(/ß/g,"ss");
 const LwithoutArticle=s=>Lnorm(s).replace(/^(der|die|das)\s+/,"");
-const LisNoun=c=>/^(der|die|das)\s/i.test(c.de);
+const LisNoun=c=>/^(der|die|das)[\s/]/i.test(c.de);
 // A reflexive verb's `sich` lives in the meaning column — （sich auf +A）期待 —
 // never in `de`, because the headword field holds the infinitive alone. The card
 // therefore teaches a form the field it is scored against does not contain.
 const LisReflexive=c=>/^sich\s/i.test(c.de||"")||/\bsich\b/i.test(c.zh||"")||/\bsich\b/i.test(c.en||"");
 const LwithoutSich=s=>Lnorm(s).replace(/^sich\s+/,"");
+// A headword can hold alternatives joined by a slash, and nobody types the slash
+// form: der/die Deutsche takes the article of the person it names, der/das
+// Joghurt is simply both, schwindelig/schwindlig are two accepted spellings. Any
+// one of them is the answer. A slash touching a hyphen is not an alternative but
+// a shortened compound (die Ja-/Nein-Frage) and stays whole, or the app would
+// accept "die Ja-" as a word.
+const LaltTok=t=>t.includes("-/")||t.includes("/-")?[t]:t.split("/").filter(Boolean);
+const LALT_CAP=12;
+function Lvariants(de){const toks=String(de||"").replace(/\s*\/\s*/g,"/").trim().split(/\s+/).filter(Boolean);
+ let out=[[]];
+ for(const t of toks){const alts=LaltTok(t);
+  out=alts.length>1&&out.length*alts.length<=LALT_CAP?out.flatMap(o=>alts.map(a=>o.concat(a))):out.map(o=>o.concat(t))}
+ return out.map(o=>o.join(" "))}
+// What to read out loud, and what to look for a recording of: one form, not the
+// slash. Otherwise the voice says the punctuation and no recording ever matches.
+const LsayForm=t=>Lvariants(t)[0]||String(t||"");
 // Examples are stored as `Deutsch.（中文）` — one field, two languages — so a
 // sentence can be shown, hidden or spoken half at a time.
 const LexampleDe=c=>String(c.example||"").split("（")[0].trim();
@@ -208,11 +224,13 @@ function Lspell(c){L$("learnBody").innerHTML=`<div class="phaseTitle">拼出德�
 // Reflexives used to be scored against the bare `freuen`, so anyone who had
 // actually absorbed the `sich freuen` the meaning column shows them was marked
 // wrong for knowing more — across every reflexive verb in the deck.
-function LspellAccepted(c,input){const a=Lnorm(input),t=Lnorm(c.de);
- if(a===t)return true;
- if(LisNoun(c)&&LwithoutArticle(a)===LwithoutArticle(t))return true;
- if(LisReflexive(c)&&LwithoutSich(a)===LwithoutSich(t))return true;
- return a.replace(/\s/g,"")===t.replace(/\s/g,"")}
+function LspellAccepted(c,input){const a=Lnorm(input);
+ if(a===Lnorm(c.de))return true;
+ return Lvariants(c.de).some(v=>{const t=Lnorm(v);
+  if(a===t)return true;
+  if(LisNoun({de:v})&&LwithoutArticle(a)===LwithoutArticle(t))return true;
+  if(LisReflexive(c)&&LwithoutSich(a)===LwithoutSich(t))return true;
+  return a.replace(/\s/g,"")===t.replace(/\s/g,"")})}
 function LcheckSpell(c,show){if(learnAnswered)return;const input=L$("learnAnswer"),v=input.value.trim();if(!show&&!v)return;learnAnswered=true;const ok=!show&&LspellAccepted(c,v);LwrongSpellResult(c,v,show,ok);const r=Lrecord(c,ok,"spell");Lfeedback(c,ok,r);L$("learnSubmit").disabled=L$("learnShow").disabled=true;L$("learnNextBtn").style.display="";Lbring(L$("learnNextBtn"),"end")}
 const LAPSE_MS=10*60*1000;
 // What one answer does to a word's schedule, kept apart from where the answer
@@ -315,7 +333,7 @@ function Lsynth(text){if(!("speechSynthesis" in window)){alert("当前浏览器�
  const v=LbestVoice();if(v)u.voice=v;
  u.lang=(v&&v.lang)||"de-DE";u.rate=+(DWStore.prefs().rate||0.85);
  speechSynthesis.speak(u)}
-async function Lspeak(text){if(await LplayRecorded(text))return;Lsynth(text)}
+async function Lspeak(text){const say=LsayForm(text);if(await LplayRecorded(say))return;Lsynth(say)}
 function LvoiceAdvice(){const ua=navigator.userAgent||"";
  if(/iPhone|iPad|iPod/i.test(ua))return "设置 → 辅助功能 → 朗读内容 → 声音 → 德语，下载「增强」或「优质」版本。";
  if(/Macintosh/i.test(ua))return "系统设置 → 辅助功能 → 朗读内容 → 系统声音 → 管理声音 → 德语，下载增强版。";
