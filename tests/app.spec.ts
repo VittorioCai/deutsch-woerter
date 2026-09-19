@@ -2209,3 +2209,82 @@ test('a round is counted in words, and ends with the day’s tally', async ({ pa
   await page.locator('#learnDoneHome').click();
   await expect(page.locator('#homeView')).toBeVisible();
 });
+
+// Review used to ask every due word three times: recognise it, recall it, then
+// write it out. Writing it out is the slow one, and a word that has already
+// written itself from memory does not owe it again every time.
+test('review asks for the spelling only from words that never passed one', async ({ page }) => {
+  await open(page);
+  const cards = await deck(page);
+  // A1 Kapitel 2: six words, every German word and every gloss distinct, so an
+  // option can be matched back to the card that prompted it.
+  const ids = cards.filter((c) => c.level === 'A1' && String(c.chapter) === '2').map((c) => c.id);
+  const lookup = await page.evaluate(() => {
+    const clean = (s: string) => (s || '').replace(/^[_\-–—\s]+/, '').replace(/\s*\([^)]*\)\s*$/, ' ').trim();
+    const byId: Record<string, { de: string; meaning: string }> = {};
+    for (const c of (window as any).__deck.cards) byId[c.id] = { de: c.de, meaning: c.zh || clean(c.en) };
+    return byId;
+  });
+  const seed = async (spellingPass: boolean) => {
+    await page.evaluate(([learnKey, schemaKey, ids, pass]) => {
+      const learn: Record<string, unknown> = {};
+      for (const id of ids as string[]) {
+        learn[id] = { introduced: true, strength: 3, wrong: 0, last: 1, due: 1, spellingPass: pass, cycles: 1, known: false };
+      }
+      localStorage.setItem(learnKey as string, JSON.stringify(learn));
+      localStorage.setItem(schemaKey as string, '2');
+    }, [LEARN_KEY, SCHEMA_KEY, ids, spellingPass] as const);
+    await page.reload();
+    await ready(page);
+  };
+  // Answering correctly is the point: a wrong answer is asked again at the end
+  // of the round, which would change both the length and the schedule.
+  const walk = async () => {
+    const stages: string[] = [];
+    await page.locator('#goLearn').click();
+    await page.selectOption('#learnLevel', 'A1');
+    await page.selectOption('#learnChapter', '2');
+    await page.locator('#learnReviewBtn').click();
+    for (let i = 0; i < 60; i++) {
+      const badge = (await page.locator('#learnBadge').textContent()) || '';
+      if (/本轮完成/.test(badge)) break;
+      stages.push(badge);
+      const german = (await page.locator('#learnBody .learnWord').count())
+        ? ((await page.locator('#learnBody .learnWord').innerText()) || '').trim() : null;
+      const meaning = (await page.locator('#learnBody .learnZh').count())
+        ? ((await page.locator('#learnBody .learnZh').innerText()) || '').trim() : null;
+      if (await page.locator('#learnBody .choice').count()) {
+        const opts = await page.locator('#learnBody .choice').evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.id ?? ''));
+        const idx = opts.findIndex((id) => german ? lookup[id]?.de === german : lookup[id]?.meaning === meaning);
+        expect(idx, `no option matched ${JSON.stringify(german ?? meaning)}`).toBeGreaterThanOrEqual(0);
+        await page.locator('#learnBody .choice').nth(idx).click();
+      } else {
+        const want = Object.values(lookup).find((x) => x.meaning === meaning);
+        await page.locator('#learnAnswer').fill(want ? want.de : 'zzz');
+        await page.locator('#learnSubmit').click();
+      }
+      await expect(page.locator('#learnFeedback')).toContainText('对了');
+      await page.locator('#learnNextBtn').click();
+    }
+    await page.locator('#modeBack').click();
+    return stages;
+  };
+
+  await seed(true);
+  const quick = await walk();
+  expect(quick.filter((s) => /主动拼写/.test(s))).toHaveLength(0);
+  expect(quick).toHaveLength(ids.length * 2);   // recognise it, recall it, done
+
+  // and the interval grew, so none of them is due again tomorrow
+  for (const id of ids) {
+    const s = await stateOf(page, id);
+    expect(s.cycles, id).toBe(2);
+    expect((s.due as number) - Date.now(), id).toBeGreaterThan(2 * 24 * 60 * 60 * 1000);
+  }
+
+  // a word that has never written itself from memory is still asked to
+  await seed(false);
+  const full = await walk();
+  expect(full.filter((s) => /主动拼写/.test(s))).toHaveLength(ids.length);
+  expect(full).toHaveLength(ids.length * 3);
+});
