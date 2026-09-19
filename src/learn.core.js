@@ -87,8 +87,8 @@ function LsetSpelling(v){learnSpelling=!!v;DWStore.prefs({spelling:learnSpelling
  for(const id of ["learnSpellToggle","homeSpellToggle"]){const el=L$(id);if(el&&el.checked!==learnSpelling)el.checked=learnSpelling}
  LspellNote();Llanding();LupdateToday()}
 function LspellNote(){const n=L$("learnSpellNote");if(n)n.innerHTML=learnSpelling
- ? "每组 5 个词：认识 → 看德语认意思 → 看意思认德语 → 拼写。<b>复习到期词时，写对过一次的词不再重复拼写</b>，省一半时间。"
- : "<b>已关闭拼写</b>：只做前几层，复习间隔照常推进，但这些词<b>不会进入「已掌握」</b> —— 打开拼写再过一轮才会。";
+ ? "学新词每组 5 个：认识 → 看德语认意思 → 看意思认德语 → 拼写。<b>复习到期词只问一道「看意思想德语」</b>；还没拼写过关的词会多一道拼写。"
+ : "<b>已关闭拼写</b>：学新词不考默写，复习间隔照常推进，但这些词<b>不会进入「已掌握」</b> —— 打开拼写再过一轮才会。";
  const h=L$("homeSpellHint");if(h)h.textContent=learnSpelling?"":"已关闭拼写 · 只快速过一遍"}
 // The page before a round used to explain the four stages, which the learner
 // has read a hundred times. It now shows the chapter itself: the first words
@@ -181,11 +181,14 @@ function LhomeStats(){if(!L$("homeMastered"))return;const cs=LallLearningCards()
  const set=(id,v)=>{const el=L$(id);if(el)el.textContent=v};set("homeTotal",cs.length);set("homeLearning",learning);set("homeDue",due);set("homeMastered",mastered);set("homeFresh",fresh);set("homeQuizWeak",Object.values(progress).filter(s=>s.wrong>0&&s.mastery<4).length);
  const bar=L$("deckBar");if(bar){const pct=n=>`${cs.length?Math.round(n/cs.length*1000)/10:0}%`;bar.querySelector(".m").style.width=pct(mastered);bar.querySelector(".l").style.width=pct(learning)}LupdateToday()}
 function Lshow(name){const home=name==="home";L$("homeView").classList.toggle("hidden",!home);L$("learnView").classList.toggle("hidden",name!=="learn");L$("quizView").classList.toggle("hidden",name!=="quiz");L$("topBar").classList.toggle("hidden",home);document.querySelector(".wrap").classList.toggle("inPage",!home);L$("topTitle").textContent=name==="learn"?"学新词":name==="quiz"?"单词检测":"";window.scrollTo({top:0,behavior:"smooth"});if(home)LhomeStats();if(name==="learn")Lstats()}
-// A word that has already written itself from memory does not have to do it
-// again on every review. The rest of the round still checks that the meaning
-// link holds, which is what a review is for, and a mastered word is asked to
-// spell again later anyway, in the spot check. A word that has never passed a
-// spelling check is still asked: without one it could never reach 已掌握.
+// A review is one question, and it is the hard one: given the meaning, produce
+// the German. Passing that implies passing the easier "which meaning is this
+// German word" — asking both, back to back, spent a third of the session
+// confirming something the next question was about to establish anyway.
+//
+// The exception is a word that has never written itself from memory. That one
+// is also asked to spell, because 已掌握 means you can produce the word, and
+// without a single spelling pass it could never get there.
 const LneedsSpell=c=>!Lstate(c).spellingPass;
 // Each item says which stage closes the round for its word, because that is the
 // stage that advances the memory cycle. Without it, a review that skips the
@@ -196,8 +199,8 @@ function LmakeQueue(cards,review=false,spot=null){const q=[],groupSize=5;
   if(spot){Lshuffle(g).forEach(c=>q.push({type:spot,c,spot:true,closes:spot}));continue}
   const spell=learnSpelling?(review?g.filter(LneedsSpell):g.slice()):[],ids=new Set(spell.map(c=>c.id));
   const closes=c=>ids.has(c.id)?"spell":"reverse";
-  if(!review)g.forEach(c=>q.push({type:"intro",c}));
-  Lshuffle(g).forEach(c=>q.push({type:"recognize",c,closes:closes(c)}));
+  if(!review){g.forEach(c=>q.push({type:"intro",c}));
+   Lshuffle(g).forEach(c=>q.push({type:"recognize",c,closes:closes(c)}))}
   Lshuffle(g).forEach(c=>q.push({type:"reverse",c,closes:closes(c)}));
   Lshuffle(spell).forEach(c=>q.push({type:"spell",c,closes:"spell"}))}
  return q}
