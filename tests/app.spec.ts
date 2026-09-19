@@ -215,14 +215,20 @@ test('a missed word comes back this session instead of in two weeks', async ({ p
   await expect(page.locator('#learnBody .choice').first()).toBeVisible();
 
   const before = await page.evaluate((k) => JSON.parse(localStorage.getItem(k) || '{}'), LEARN_KEY);
-  const byId = new Map((await deck(page)).map((c) => [c.id, c]));
-  const shown = ((await page.locator('#learnBody .learnWord').innerText()) || '').trim();
+  // A review asks for recall: the meaning is shown, the options are German. A
+  // distractor is never a card that means the same thing, so an option whose
+  // card means something else is deterministically the wrong answer.
+  const meaningOf = await page.evaluate(() => {
+    const clean = (s: string) => (s || '').replace(/^[_\-–—\s]+/, '').replace(/\s*\([^)]*\)\s*$/, ' ').trim();
+    const byId: Record<string, string> = {};
+    for (const c of (window as any).__deck.cards) byId[c.id] = c.zh || clean(c.en);
+    return byId;
+  });
+  const shown = ((await page.locator('#learnBody .learnZh').innerText()) || '').trim();
   const optionIds = await page.locator('#learnBody .choice').evaluateAll((els) =>
     els.map((el) => (el as HTMLElement).dataset.id ?? ''),
   );
-  // A card with a different German form necessarily has a different id, which is
-  // what Lchoice() compares, so this click is deterministically a miss.
-  const wrongIndex = optionIds.findIndex((id) => (byId.get(id)?.de ?? '').trim() !== shown);
+  const wrongIndex = optionIds.findIndex((id) => (meaningOf[id] ?? '').trim() !== shown);
   expect(wrongIndex, `no option distinguishable from "${shown}" in ${JSON.stringify(optionIds)}`).toBeGreaterThanOrEqual(0);
   await page.locator('#learnBody .choice').nth(wrongIndex).click();
   await expect(page.locator('#learnBody .choice.wrong')).toHaveCount(1);
@@ -333,6 +339,8 @@ test('today card clears due words across chapters in one session', async ({ page
     }
     localStorage.setItem(learnKey as string, JSON.stringify(learn));
     localStorage.setItem(schemaKey as string, '2');
+    // A fixed round size, so the arithmetic below has one unknown, not two.
+    localStorage.setItem('netzwerk_vocab_prefs_v1', JSON.stringify({ count: 5 }));
   }, [LEARN_KEY, SCHEMA_KEY, ids] as const);
   await page.reload();
   await ready(page);
@@ -343,11 +351,12 @@ test('today card clears due words across chapters in one session', async ({ page
   await expect(page.locator('#learnCard')).toBeVisible();
   await expect(page.locator('#learnBadge')).toContainText('1/');
 
-  // The queue length is the proof that it spans chapters: each due word costs
-  // three stages, so 12 due words across three Kapitel means at least 36 items.
-  // Chapter-locked review would have found only the 4 words in one Kapitel.
+  // The queue length is the proof that it spans chapters. These twelve have
+  // never passed a spelling check, so each costs a recall question and a
+  // spelling one; the five new words cost three questions each. Chapter-locked
+  // review would have found only the four words in one Kapitel.
   const total = Number((await page.locator('#learnBadge').textContent())!.match(/\/(\d+)/)![1]);
-  expect(total).toBeGreaterThanOrEqual(36);
+  expect(total).toBe(12 * 2 + 5 * 3);
 });
 
 test('a chapter-specific sense does not announce itself among the options', async ({ page }) => {
@@ -2213,7 +2222,7 @@ test('a round is counted in words, and ends with the day’s tally', async ({ pa
 // Review used to ask every due word three times: recognise it, recall it, then
 // write it out. Writing it out is the slow one, and a word that has already
 // written itself from memory does not owe it again every time.
-test('review asks for the spelling only from words that never passed one', async ({ page }) => {
+test('a review is one question a word, and it is the hard one', async ({ page }) => {
   await open(page);
   const cards = await deck(page);
   // A1 Kapitel 2: six words, every German word and every gloss distinct, so an
@@ -2273,7 +2282,8 @@ test('review asks for the spelling only from words that never passed one', async
   await seed(true);
   const quick = await walk();
   expect(quick.filter((s) => /主动拼写/.test(s))).toHaveLength(0);
-  expect(quick).toHaveLength(ids.length * 2);   // recognise it, recall it, done
+  expect(quick.every((s) => /看意思选德语/.test(s))).toBe(true);
+  expect(quick).toHaveLength(ids.length);   // one question a word, the hard one
 
   // and the interval grew, so none of them is due again tomorrow
   for (const id of ids) {
@@ -2286,5 +2296,5 @@ test('review asks for the spelling only from words that never passed one', async
   await seed(false);
   const full = await walk();
   expect(full.filter((s) => /主动拼写/.test(s))).toHaveLength(ids.length);
-  expect(full).toHaveLength(ids.length * 3);
+  expect(full).toHaveLength(ids.length * 2);
 });
