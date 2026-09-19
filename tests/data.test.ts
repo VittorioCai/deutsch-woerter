@@ -596,7 +596,7 @@ describe('when a word comes back', () => {
   // in a round came straight back as 到期复习 on the home screen: the more you
   // got wrong, the longer the list, and the list is what people feel.
   describe('a missed question is asked again before the round ends', () => {
-    type Q = { type: string; c: { id: string }; spot?: boolean; retry?: boolean; tries?: number };
+    type Q = { type: string; c: { id: string }; spot?: boolean; retry?: boolean; tries?: number; closes?: string };
     const round = (progress: Record<string, S> = {}, spelling = true) => {
       const api = load<{
         Lrecord(c: { id: string }, ok: boolean, type: string): { again: boolean; tomorrow: boolean };
@@ -654,6 +654,30 @@ describe('when a word comes back', () => {
       expect(last.tomorrow).toBe(true);
       expect(api.queue()).toHaveLength(3);
       expect((api.Lstate(w).due as number) - Date.now()).toBeGreaterThan(23 * HOUR);
+    });
+
+    // A review round asks for the spelling only from words that have never
+    // written themselves from memory. The rest close on the reverse question,
+    // and that has to be what moves them up the ladder, or their interval would
+    // never grow and the same words would come back every day for ever.
+    it('moves a word up the ladder on whatever stage closes its round', () => {
+      const api = round({ w: { introduced: true, strength: 3, cycles: 1, spellingPass: true, due: 1 } });
+      api.start([{ type: 'reverse', c: w, closes: 'reverse' }]);
+      api.Lrecord(w, true, 'reverse');
+      expect(api.Lstate(w).cycles).toBe(2);
+      const gap = (api.Lstate(w).due as number) - Date.now();
+      expect(gap).toBeGreaterThan(2.9 * 24 * HOUR);   // 3 days: the rung above
+      expect(gap).toBeLessThan(3.1 * 24 * HOUR);
+    });
+
+    it('does not move it up on a stage the round has not finished with', () => {
+      const api = round({ w: { introduced: true, strength: 3, cycles: 1, spellingPass: false, due: 1 } });
+      api.start([{ type: 'reverse', c: w, closes: 'spell' }, { type: 'spell', c: w, closes: 'spell' }]);
+      api.Lrecord(w, true, 'reverse');
+      expect(api.Lstate(w).cycles).toBe(1);
+      api.advance();
+      api.Lrecord(w, true, 'spell');
+      expect(api.Lstate(w).cycles).toBe(2);
     });
 
     it('costs a mastered word one rung of the ladder, not the whole ladder', () => {

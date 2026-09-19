@@ -87,7 +87,7 @@ function LsetSpelling(v){learnSpelling=!!v;DWStore.prefs({spelling:learnSpelling
  for(const id of ["learnSpellToggle","homeSpellToggle"]){const el=L$(id);if(el&&el.checked!==learnSpelling)el.checked=learnSpelling}
  LspellNote();Llanding();LupdateToday()}
 function LspellNote(){const n=L$("learnSpellNote");if(n)n.innerHTML=learnSpelling
- ? "每组 5 个词：认识 → 看德语认意思 → 看意思认德语 → 拼写。"
+ ? "每组 5 个词：认识 → 看德语认意思 → 看意思认德语 → 拼写。<b>复习到期词时，写对过一次的词不再重复拼写</b>，省一半时间。"
  : "<b>已关闭拼写</b>：只做前几层，复习间隔照常推进，但这些词<b>不会进入「已掌握」</b> —— 打开拼写再过一轮才会。";
  const h=L$("homeSpellHint");if(h)h.textContent=learnSpelling?"":"已关闭拼写 · 只快速过一遍"}
 // The page before a round used to explain the four stages, which the learner
@@ -181,7 +181,26 @@ function LhomeStats(){if(!L$("homeMastered"))return;const cs=LallLearningCards()
  const set=(id,v)=>{const el=L$(id);if(el)el.textContent=v};set("homeTotal",cs.length);set("homeLearning",learning);set("homeDue",due);set("homeMastered",mastered);set("homeFresh",fresh);set("homeQuizWeak",Object.values(progress).filter(s=>s.wrong>0&&s.mastery<4).length);
  const bar=L$("deckBar");if(bar){const pct=n=>`${cs.length?Math.round(n/cs.length*1000)/10:0}%`;bar.querySelector(".m").style.width=pct(mastered);bar.querySelector(".l").style.width=pct(learning)}LupdateToday()}
 function Lshow(name){const home=name==="home";L$("homeView").classList.toggle("hidden",!home);L$("learnView").classList.toggle("hidden",name!=="learn");L$("quizView").classList.toggle("hidden",name!=="quiz");L$("topBar").classList.toggle("hidden",home);document.querySelector(".wrap").classList.toggle("inPage",!home);L$("topTitle").textContent=name==="learn"?"学新词":name==="quiz"?"单词检测":"";window.scrollTo({top:0,behavior:"smooth"});if(home)LhomeStats();if(name==="learn")Lstats()}
-function LmakeQueue(cards,review=false,spot=null){const q=[],groupSize=5;for(let i=0;i<cards.length;i+=groupSize){const g=cards.slice(i,i+groupSize);if(spot){Lshuffle(g).forEach(c=>q.push({type:spot,c,spot:true}));continue}if(!review)g.forEach(c=>q.push({type:"intro",c}));Lshuffle(g).forEach(c=>q.push({type:"recognize",c}));Lshuffle(g).forEach(c=>q.push({type:"reverse",c}));if(learnSpelling)Lshuffle(g).forEach(c=>q.push({type:"spell",c}))}return q}
+// A word that has already written itself from memory does not have to do it
+// again on every review. The rest of the round still checks that the meaning
+// link holds, which is what a review is for, and a mastered word is asked to
+// spell again later anyway, in the spot check. A word that has never passed a
+// spelling check is still asked: without one it could never reach 已掌握.
+const LneedsSpell=c=>!Lstate(c).spellingPass;
+// Each item says which stage closes the round for its word, because that is the
+// stage that advances the memory cycle. Without it, a review that skips the
+// spelling check would leave the interval where it was and ask the same word
+// again tomorrow, for ever.
+function LmakeQueue(cards,review=false,spot=null){const q=[],groupSize=5;
+ for(let i=0;i<cards.length;i+=groupSize){const g=cards.slice(i,i+groupSize);
+  if(spot){Lshuffle(g).forEach(c=>q.push({type:spot,c,spot:true,closes:spot}));continue}
+  const spell=learnSpelling?(review?g.filter(LneedsSpell):g.slice()):[],ids=new Set(spell.map(c=>c.id));
+  const closes=c=>ids.has(c.id)?"spell":"reverse";
+  if(!review)g.forEach(c=>q.push({type:"intro",c}));
+  Lshuffle(g).forEach(c=>q.push({type:"recognize",c,closes:closes(c)}));
+  Lshuffle(g).forEach(c=>q.push({type:"reverse",c,closes:closes(c)}));
+  Lshuffle(spell).forEach(c=>q.push({type:"spell",c,closes:"spell"}))}
+ return q}
 function Lstart(review=false){learnToday=false;const cs=Lcards(),now=Date.now();let selected;if(review){selected=cs.filter(c=>{const s=Lstate(c);return s.introduced&&!Lmastered(s)&&(s.due||0)<=now});if(!selected.length){alert(`${LscopeLabel()} 现在没有到期需要复习的词。可以继续学新词。`);return}selected=selected.slice(0,Math.max(5,+L$("learnCount").value));learnRoundNew=0}else{selected=cs.filter(c=>{const s=Lstate(c);return !s.introduced&&!s.known}).slice(0,+L$("learnCount").value);if(!selected.length){alert(`${LscopeLabel()} 的新词已经学完了，可以复习到期词，或者切换章节。`);return}learnRoundNew=selected.length}learnQueue=LmakeQueue(selected,review);learnPos=0;learnCorrect=0;learnAnswered=false;Lrender();Lbring(L$("learnCard"),"start")}
 function Llabel(type){return type==="intro"?"认识新词":type==="recognize"?"看德语选意思":type==="reverse"?"看意思选德语":"主动拼写"}
 // Two entries for the same headword are two senses of one word, so offering one
@@ -236,8 +255,12 @@ const LAPSE_MS=10*60*1000;
 // What one answer does to a word's schedule, kept apart from where the answer
 // came from: 单词检测 asks the same words with the same two skills, and a second
 // copy of these transitions is how the wrong-book drifted out of step before.
-function LapplyAnswer(s,ok,type,repair=false){s.introduced=true;s.last=Date.now();
- if(ok){if(type==="spell"){s.strength=Math.min(5,(s.strength||0)+2);s.spellingPass=true;if(!repair)s.cycles=(s.cycles||0)+1}else{s.strength=Math.min(5,(s.strength||0)+1);if(!repair&&!learnSpelling&&type==="reverse")s.cycles=(s.cycles||0)+1}
+function LapplyAnswer(s,ok,type,repair=false,closes){s.introduced=true;s.last=Date.now();
+ if(ok){if(type==="spell"){s.strength=Math.min(5,(s.strength||0)+2);s.spellingPass=true}else s.strength=Math.min(5,(s.strength||0)+1);
+  // Only the stage that closes the word's round moves it up the ladder. 单词检测
+  // answers arrive without a round behind them, and keep the old rule.
+  const closing=closes===undefined?type==="spell"||(!learnSpelling&&type==="reverse"):closes===type;
+  if(!repair&&closing)s.cycles=(s.cycles||0)+1;
   s.due=Date.now()+(repair?Linterval({cycles:Math.max(1,s.cycles||0)}):Linterval(s))}
  else{s.wrong=(s.wrong||0)+1;s.lapses=(s.lapses||0)+1;s.strength=Math.max(0,(s.strength||0)-1);s.cycles=Math.max(0,(s.cycles||0)-1);if(type==="spell")s.spellingPass=false;s.known=false;s.due=Date.now()+LAPSE_MS}
  return s}
@@ -250,8 +273,8 @@ function LapplyAnswer(s,ok,type,repair=false){s.introduced=true;s.last=Date.now(
 // review into pressure. Only an abandoned round keeps the ten-minute lapse.
 const LRETRY_MAX=2,LDAY_MS=24*60*60*1000;
 function Lrecord(c,ok,type){const s=Lstate(c),t=learnQueue[learnPos]||{},r={ok,again:false,tomorrow:false};
- if(ok){learnCorrect++;LapplyAnswer(s,true,type,!!t.retry)}
- else{LapplyAnswer(s,false,type);const tries=t.tries||0;if(tries<LRETRY_MAX){learnQueue.push({type,c,spot:t.spot,retry:true,tries:tries+1});r.again=true}else{s.due=Date.now()+LDAY_MS;r.tomorrow=true}}
+ if(ok){learnCorrect++;LapplyAnswer(s,true,type,!!t.retry,t.closes)}
+ else{LapplyAnswer(s,false,type);const tries=t.tries||0;if(tries<LRETRY_MAX){learnQueue.push({type,c,spot:t.spot,closes:t.closes,retry:true,tries:tries+1});r.again=true}else{s.due=Date.now()+LDAY_MS;r.tomorrow=true}}
  Lsave(c,s);return r}
 // After an answer the question dims and the feedback is short: the answer, the
 // meaning, and when the word comes back, in words. The card's details fold
