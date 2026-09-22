@@ -349,14 +349,14 @@ test('today card clears due words across chapters in one session', async ({ page
   await expect(page.locator('#todayBreak')).toContainText('12 个到期复习');
   await page.locator('#goToday').click();
   await expect(page.locator('#learnCard')).toBeVisible();
-  await expect(page.locator('#learnBadge')).toContainText('1/');
+  await expect(page.locator('#learnBadge')).toContainText('还剩');
 
   // The queue length is the proof that it spans chapters. These twelve have
   // never passed a spelling check, so each costs a recall question and a
   // spelling one; the five new words cost three questions each. Chapter-locked
   // review would have found only the four words in one Kapitel.
-  const total = Number((await page.locator('#learnBadge').textContent())!.match(/\/(\d+)/)![1]);
-  expect(total).toBe(12 * 2 + 5 * 3);
+  const left = Number((await page.locator('#learnBadge').textContent())!.match(/还剩 (\d+) 个词/)![1]);
+  expect(left).toBe(12 + 5);
 });
 
 test('a chapter-specific sense does not announce itself among the options', async ({ page }) => {
@@ -969,8 +969,8 @@ test('round size offers larger sets and remembers the choice', async ({ page }) 
   // the size actually drives the session
   await page.selectOption('#learnCount', '20');
   await page.locator('#learnStartBtn').click();
-  const total = Number((await page.locator('#learnBadge').textContent())!.match(/\/(\d+)/)![1]);
-  expect(total).toBe(20); // the badge counts words while they are being introduced
+  const total = Number((await page.locator('#learnBadge').textContent())!.match(/还剩 (\d+) 个词/)![1]);
+  expect(total).toBe(20); // the badge counts words, never the questions they cost
 });
 
 test('Android is told to install the German voice data, not just switch browser', async ({ page }) => {
@@ -2191,9 +2191,10 @@ test('a round is counted in words, and ends with the day’s tally', async ({ pa
   await openSettings(page);
   await page.selectOption('#learnCount', '5');
   await page.locator('#learnStartBtn').click();
-  await expect(page.locator('#learnBadge')).toHaveText(/认识新词 · 1\/5$/);
+  await expect(page.locator('#learnBadge')).toHaveText(/认识新词 · 还剩 5 个词$/);
   for (let i = 0; i < 5; i++) await page.locator('#learnRemember').click();
-  await expect(page.locator('#learnBadge')).toHaveText(/ · 1\/15$/);
+  // still five words in play: an introduction does not finish a word
+  await expect(page.locator('#learnBadge')).toHaveText(/ · 还剩 5 个词$/);
 
   let checkedFeedback = false;
   for (let i = 0; i < 120; i++) {
@@ -2297,4 +2298,92 @@ test('a review is one question a word, and it is the hard one', async ({ page })
   const full = await walk();
   expect(full.filter((s) => /主动拼写/.test(s))).toHaveLength(ids.length);
   expect(full).toHaveLength(ids.length * 2);
+});
+
+// The sticky 继续 button sat on top of the answer: the line saying what the word
+// means was behind it at the moment it appeared, and the auto-scroll brought the
+// button into view rather than the answer.
+test('after an answer, the answer is what is on screen, not the button', async ({ page }) => {
+  await open(page);
+  await page.locator('#goLearn').click();
+  await page.locator('#learnStartBtn').click();
+  for (let i = 0; i < 6 && !(await page.locator('#learnBody .choice').count()); i++) {
+    await page.locator('#learnRemember').click();
+  }
+  await page.locator('#learnBody .choice').first().click();
+  await expect(page.locator('#learnFeedback')).toHaveClass(/show/);
+  await expect(page.locator('#learnNextBtn')).toBeVisible();
+  // let the smooth scroll settle
+  await expect.poll(async () => page.evaluate(() => {
+    const fb = document.getElementById('learnFeedback')!.getBoundingClientRect();
+    const btn = document.querySelector('.learnNextRow')!.getBoundingClientRect();
+    const meaning = document.querySelector('#learnFeedback .answerRow + div')!.getBoundingClientRect();
+    return { fbTop: Math.round(fb.top), meaningBottom: Math.round(meaning.bottom), btnTop: Math.round(btn.top) };
+  }).then((b) => b.meaningBottom <= b.btnTop && b.fbTop >= 0)).toBe(true);
+});
+
+// An iPhone throws a site's storage away after seven days unless it is on the
+// home screen, and this site's storage is the deck plus every word ever learnt.
+test('an iPhone is told that the home screen is what keeps the data', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'userAgent', { configurable: true,
+      value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile Safari/604.1' });
+  });
+  await open(page);
+  const note = page.locator('#installNote');
+  await expect(note).toBeVisible();
+  await expect(note).toContainText('七天不打开');
+  await expect(note).toContainText('添加到主屏幕');
+  // and it is the first thing on the home screen, above the day's task
+  const order = await page.evaluate(() => {
+    const kids = [...document.getElementById('homeView')!.children].map((el) => el.id || el.className);
+    return kids[0];
+  });
+  expect(order).toBe('installNote');
+
+  await page.locator('#installNoteOk').click();
+  await expect(note).toHaveCount(0);
+  await page.evaluate(() => (window as any).DWStore.flush());
+  await page.reload();
+  await ready(page);
+  await expect(page.locator('#installNote')).toHaveCount(0);   // not again for a month
+});
+
+// The backup held every answer and none of the settings, so a restore put the
+// learner back on a correct history and a stranger's setup.
+test('a backup carries the settings and the chapter you had reached', async ({ page }) => {
+  await open(page);
+  await page.locator('#goLearn').click();
+  await page.selectOption('#learnLevel', 'A2');
+  await page.selectOption('#learnChapter', '5');
+  await openSettings(page);
+  await page.selectOption('#learnCount', '30');
+  await page.locator('#learnSpellToggle').uncheck();
+  await page.evaluate(() => (window as any).DWStore.flush());
+
+  const backup = await page.evaluate(() => JSON.stringify((window as any).DWStore.snapshot()));
+  expect(JSON.parse(backup).prefs).toMatchObject({ level: 'A2', chapter: '5', count: 30, spelling: false });
+
+  // a phone that has never seen any of this
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await ready(page);
+  await expect(page.locator('#homeSpellToggle')).toBeChecked();
+
+  await page.locator('#homeMore summary').click();
+  await page.evaluate((text) => {
+    const input = document.getElementById('fileImport') as HTMLInputElement;
+    const file = new File([text], 'backup.json', { type: 'application/json' });
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }, backup);
+  await ready(page);
+  await expect(page.locator('#homeSpellToggle')).not.toBeChecked();
+  await page.locator('#goLearn').click();
+  await expect(page.locator('#learnLevel')).toHaveValue('A2');
+  await expect(page.locator('#learnChapter')).toHaveValue('5');
+  await openSettings(page);
+  await expect(page.locator('#learnCount')).toHaveValue('30');
 });

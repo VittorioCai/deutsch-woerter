@@ -91,7 +91,7 @@
       return parsed;
     } catch (e) {
       try { localStorage.removeItem(key); } catch (_) {}
-      notice("bad", `存档 <code>${esc(key)}</code> 已损坏，已重置这一项以便应用继续使用。如果你有备份，请用「导入学习记录」恢复。`);
+      notice("bad", `存档 <code>${esc(key)}</code> 已损坏，已重置这一项以便应用继续使用。如果你有备份，请用「从备份恢复」恢复。`);
       return fallback;
     }
   }
@@ -106,7 +106,7 @@
       notice(
         "bad",
         full
-          ? "<b>浏览器存储空间已满，刚才的进度没能保存。</b> 请导出学习记录备份，然后清理本站数据或删掉一些错题。"
+          ? "<b>浏览器存储空间已满，刚才的进度没能保存。</b> 请先点首页那一行的「备份」，然后清理本站数据或删掉一些错题。"
           : "<b>学习记录保存失败，进度可能会丢。</b> 建议现在导出一份备份。",
         [{ label: "立即导出备份", run: () => api.exportBackup() }],
       );
@@ -231,7 +231,7 @@
 
     snapshot() {
       return {
-        version: 6,
+        version: 7,
         schema: SCHEMA_VERSION,
         exportedAt: new Date().toISOString(),
         quizProgress: read(QUIZ, {}),
@@ -241,6 +241,10 @@
         // are not in the word list they correct — a backup without them loses
         // every fix on restore.
         cardPatches: (typeof window !== "undefined" && window.DWPatches) ? window.DWPatches.get() : {},
+        // Which Kapitel you had reached, the round size, the voice, whether
+        // spelling is on. Restoring without these leaves the learner on a
+        // correct history and a stranger's settings.
+        prefs: read(PREFS, {}),
       };
     },
 

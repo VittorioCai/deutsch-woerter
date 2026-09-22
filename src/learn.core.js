@@ -231,7 +231,13 @@ function Lexample(c){if(!c.example)return "";const de=LexampleDe(c),zh=LexampleZ
 document.addEventListener("click",e=>{const b=e.target.closest(".exampleZh");if(!b)return;e.preventDefault();const d=document.createElement("div");d.className="exampleZhShown";d.textContent=b.dataset.zh;b.replaceWith(d)});
 function Ldetails(c){return `${Linsight(c)}${c.grammar?`<div class="grammarBox"><span class="boxLabel">词形</span>${Lesc(c.grammar)}</div>`:""}${Lexample(c)}`}
 function LeditLink(c){return typeof LeditBtn==="function"?LeditBtn(c.id):""}
-function Lrender(){const fb=L$("learnFeedback");fb.className="feedback";fb.innerHTML="";L$("learnNextBtn").style.display="none";learnAnswered=false;if(learnPos>=learnQueue.length)return Lfinish();const t=learnQueue[learnPos],c=t.c;const intro=t.type==="intro",same=learnQueue.filter(x=>(x.type==="intro")===intro);L$("learnBadge").textContent=`${t.spot?"已掌握抽查 · ":""}${t.retry?"再来一次 · ":""}${Llabel(t.type)} · ${same.indexOf(t)+1}/${same.length}`;L$("learnBar").style.width=`${Math.round(learnPos/learnQueue.length*100)}%`;if(t.type==="intro")Lintro(c);else if(t.type==="recognize")Lrecognize(c);else if(t.type==="reverse")Lreverse(c);else Lspell(c);LcardEnter()}
+// Two numbers for one round used to disagree: the home screen promised 25 words
+// and the round opened with 1/35, the questions those words cost. The badge
+// counts words now, and a retry cannot inflate it, because a retry is the same
+// word coming round again. The bar still measures questions, so it never claims
+// more progress than there is.
+function LwordsLeft(){const rest=new Set();for(let i=learnPos;i<learnQueue.length;i++)rest.add(learnQueue[i].c.id);return rest.size}
+function Lrender(){const fb=L$("learnFeedback");fb.className="feedback";fb.innerHTML="";L$("learnNextBtn").style.display="none";learnAnswered=false;if(learnPos>=learnQueue.length)return Lfinish();const t=learnQueue[learnPos],c=t.c;L$("learnBadge").textContent=`${t.spot?"已掌握抽查 · ":""}${t.retry?"再来一次 · ":""}${Llabel(t.type)} · 还剩 ${LwordsLeft()} 个词`;L$("learnBar").style.width=`${Math.round(learnPos/learnQueue.length*100)}%`;if(t.type==="intro")Lintro(c);else if(t.type==="recognize")Lrecognize(c);else if(t.type==="reverse")Lreverse(c);else Lspell(c);LcardEnter()}
 // The next card slides in instead of appearing: a replaced innerHTML has no
 // motion of its own, so the class is taken off and put back to restart it.
 function LcardEnter(){const b=L$("learnBody");if(!b)return;b.classList.remove("enter","answered");void b.offsetWidth;b.classList.add("enter")}
@@ -239,7 +245,7 @@ function Lintro(c){const edit=LeditLink(c);L$("learnBody").innerHTML=`<div class
 function LintroDone(c,known){const s=Lstate(c);s.introduced=true;s.last=Date.now();if(known){s.known=true;s.strength=5;s.spellingPass=true;s.cycles=3;s.due=Date.now()+30*24*60*60*1000;learnQueue=learnQueue.filter((t,i)=>i<=learnPos||t.c.id!==c.id)}else{s.strength=Math.max(1,s.strength||0);s.due=Date.now()}Lsave(c,s);learnPos++;Lrender()}
 function Lrecognize(c){const opts=Lshuffle([c,...Ldistractors(c)]);L$("learnBody").innerHTML=`<div class="phaseTitle">这个德语词是什么意思？</div><div class="wordRow"><div class="learnWord">${Lesc(c.de)}</div>${LspeakBtn(c.de)}</div><div class="choiceGrid">${opts.map(x=>`<button class="choice" data-id="${Lesc(x.id)}">${Lesc(LoptionZh(x))}${LhasZh(x)?`<div class="small">${Lesc(LoptionEn(x))}</div>`:""}</button>`).join("")}</div>`;document.querySelectorAll("#learnBody .choice").forEach(b=>b.onclick=()=>Lchoice(c,b.dataset.id,c.id,"recognize"))}
 function Lreverse(c){const opts=Lshuffle([c,...Ldistractors(c,3,x=>x.de)]);L$("learnBody").innerHTML=`<div class="phaseTitle">哪个是它的德语？</div><div class="learnZh">${Lesc(Lmeaning(c))}</div><div class="learnEn">${LhasZh(c)?Lesc(Lenglish(c)):""}</div><div class="choiceGrid">${opts.map(x=>`<button class="choice" data-id="${Lesc(x.id)}">${Lesc(x.de)}</button>`).join("")}</div>`;document.querySelectorAll("#learnBody .choice").forEach(b=>b.onclick=()=>Lchoice(c,b.dataset.id,c.id,"reverse"))}
-function Lchoice(c,picked,expected,type){if(learnAnswered)return;learnAnswered=true;const ok=picked===expected;document.querySelectorAll("#learnBody .choice").forEach(b=>{b.disabled=true;if(b.dataset.id===expected)b.classList.add("correct");else if(b.dataset.id===picked)b.classList.add("wrong")});const r=Lrecord(c,ok,type);Lfeedback(c,ok,r);L$("learnNextBtn").style.display="";Lbring(L$("learnNextBtn"),"end")}
+function Lchoice(c,picked,expected,type){if(learnAnswered)return;learnAnswered=true;const ok=picked===expected;document.querySelectorAll("#learnBody .choice").forEach(b=>{b.disabled=true;if(b.dataset.id===expected)b.classList.add("correct");else if(b.dataset.id===picked)b.classList.add("wrong")});const r=Lrecord(c,ok,type);Lfeedback(c,ok,r);L$("learnNextBtn").style.display="";Lbring(L$("learnFeedback"),"start")}
 function Lspell(c){L$("learnBody").innerHTML=`<div class="phaseTitle">拼出德语</div><div class="learnZh">${Lesc(Lmeaning(c))}</div><div class="learnEn">${LhasZh(c)?Lesc(Lenglish(c)):""}</div><div class="answerBox" style="margin-top:18px"><input id="learnAnswer" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="done" placeholder="输入德语…"><button class="primary" id="learnSubmit">检查</button><button class="secondary" id="learnShow">不会 / 看答案</button></div>${LcharBar("learnAnswer")}<div class="small spellHint">名词可以不写冠词。</div>`;const input=L$("learnAnswer");L$("learnSubmit").onclick=()=>{input.blur();LcheckSpell(c,false)};L$("learnShow").onclick=()=>{input.blur();LcheckSpell(c,true)};input.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();input.blur();LcheckSpell(c,false)}});setTimeout(()=>{try{input.focus({preventScroll:true})}catch(e){input.focus()}},80)}
 // A noun may be typed without its article and a reflexive verb with or without
 // its sich: both are forms the card itself teaches but the headword cannot hold.
@@ -253,7 +259,7 @@ function LspellAccepted(c,input){const a=Lnorm(input);
   if(LisNoun({de:v})&&LwithoutArticle(a)===LwithoutArticle(t))return true;
   if(LisReflexive(c)&&LwithoutSich(a)===LwithoutSich(t))return true;
   return a.replace(/\s/g,"")===t.replace(/\s/g,"")})}
-function LcheckSpell(c,show){if(learnAnswered)return;const input=L$("learnAnswer"),v=input.value.trim();if(!show&&!v)return;learnAnswered=true;const ok=!show&&LspellAccepted(c,v);LwrongSpellResult(c,v,show,ok);const r=Lrecord(c,ok,"spell");Lfeedback(c,ok,r);L$("learnSubmit").disabled=L$("learnShow").disabled=true;L$("learnNextBtn").style.display="";Lbring(L$("learnNextBtn"),"end")}
+function LcheckSpell(c,show){if(learnAnswered)return;const input=L$("learnAnswer"),v=input.value.trim();if(!show&&!v)return;learnAnswered=true;const ok=!show&&LspellAccepted(c,v);LwrongSpellResult(c,v,show,ok);const r=Lrecord(c,ok,"spell");Lfeedback(c,ok,r);L$("learnSubmit").disabled=L$("learnShow").disabled=true;L$("learnNextBtn").style.display="";Lbring(L$("learnFeedback"),"start")}
 const LAPSE_MS=10*60*1000;
 // What one answer does to a word's schedule, kept apart from where the answer
 // came from: 单词检测 asks the same words with the same two skills, and a second
@@ -386,7 +392,7 @@ function LbuildShell(){document.title="Deutsch Wörter";const wrap=document.quer
 lc.onchange=()=>{DWStore.prefs({count:+lc.value});LupdateToday()};
 L$("voiceRate").value=String(DWStore.prefs().rate||0.85);L$("voiceRate").onchange=()=>{DWStore.prefs({rate:+L$("voiceRate").value});Lspeak("Guten Tag")};L$("voicePick").onchange=()=>{DWStore.prefs({voice:L$("voicePick").value});LrenderVoicePicker();Lspeak("Guten Tag")};const rec=L$("recordedToggle");rec.checked=DWStore.prefs().recorded!==false;
 rec.onchange=()=>{DWStore.prefs({recorded:rec.checked});LrecordedNote()};LrecordedNote();
-L$("voiceTest").onclick=()=>Lspeak("Haus");LrenderVoicePicker();L$("learnMapBtn").onclick=()=>{if(typeof LopenBrowse==="function")LopenBrowse("")};L$("learnSettingsBtn").onclick=()=>{const d=L$("learnSettings");d.open=!d.open;if(d.open)Lbring(d,"start")};L$("learnStartBtn").onclick=()=>Lstart(false);L$("learnReviewBtn").onclick=()=>Lstart(true);L$("learnNextBtn").onclick=()=>{learnPos++;Lrender();Lbring(L$("learnCard"),"start")};L$("learnLevel").onchange=()=>{DWStore.prefs({level:L$("learnLevel").value});LsyncChapters()};L$("learnChapter").onchange=()=>{DWStore.prefs({chapter:L$("learnChapter").value});Lstats();Llanding()};L$("learnResetBtn").onclick=()=>{const label=LscopeLabel();if(confirm(`确定重置 ${label} 的背词进度吗？其他章节和单词检测记录不会受影响。`)){for(const c of Lcards())delete learnProgress[c.id];DWStore.queue(LEARN_KEY,()=>learnProgress);DWStore.flush();Lstats();LhomeStats();Llanding("已重置当前章节，可以重新从第一个词开始。")}};L$("exportBtn").onclick=()=>{DWStore.flush();DWStore.exportBackup()};L$("importBtn").onclick=()=>L$("fileImport").click();L$("fileImport").onchange=async e=>{const f=e.target.files&&e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());let q,l,w;if(d.version>=2&&(d.quizProgress||d.learnProgress)){q=d.quizProgress||{};l=d.learnProgress||{};w=(d.spellingWrongBook&&typeof d.spellingWrongBook==="object")?d.spellingWrongBook:{}}else{const p=d.progress||d;if(!p||typeof p!=="object"||Array.isArray(p))throw 0;q=p;l={};w={}}
+L$("voiceTest").onclick=()=>Lspeak("Haus");LrenderVoicePicker();L$("learnMapBtn").onclick=()=>{if(typeof LopenBrowse==="function")LopenBrowse("")};L$("learnSettingsBtn").onclick=()=>{const d=L$("learnSettings");d.open=!d.open;if(d.open)Lbring(d,"start")};L$("learnStartBtn").onclick=()=>Lstart(false);L$("learnReviewBtn").onclick=()=>Lstart(true);L$("learnNextBtn").onclick=()=>{learnPos++;Lrender();Lbring(L$("learnCard"),"start")};L$("learnLevel").onchange=()=>{DWStore.prefs({level:L$("learnLevel").value});LsyncChapters()};L$("learnChapter").onchange=()=>{DWStore.prefs({chapter:L$("learnChapter").value});Lstats();Llanding()};L$("learnResetBtn").onclick=()=>{const label=LscopeLabel();if(confirm(`确定重置 ${label} 的背词进度吗？其他章节和单词检测记录不会受影响。`)){for(const c of Lcards())delete learnProgress[c.id];DWStore.queue(LEARN_KEY,()=>learnProgress);DWStore.flush();Lstats();LhomeStats();Llanding("已重置当前章节，可以重新从第一个词开始。")}};L$("importBtn").onclick=()=>L$("fileImport").click();L$("fileImport").onchange=async e=>{const f=e.target.files&&e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text());let q,l,w;if(d.version>=2&&(d.quizProgress||d.learnProgress)){q=d.quizProgress||{};l=d.learnProgress||{};w=(d.spellingWrongBook&&typeof d.spellingWrongBook==="object")?d.spellingWrongBook:{}}else{const p=d.progress||d;if(!p||typeof p!=="object"||Array.isArray(p))throw 0;q=p;l={};w={}}
 // Import merges instead of replacing. Restoring a 2-word backup from another
 // device used to overwrite a fully-studied deck.
 const mode=(Object.keys(q).length+Object.keys(l).length)&&confirm("把备份【合并】进现有记录吗？\n\n确定 = 合并（同一个词保留较新的一次）\n取消 = 用备份【完全替换】本机记录")?"merge":"replace";
@@ -403,7 +409,12 @@ if(d.cardPatches&&typeof d.cardPatches==="object"&&!Array.isArray(d.cardPatches)
  for(const c of LallLearningCards())if(next[c.id]||cur[c.id])LapplyPatchTo(c);
  LcardsChanged();
 }
-alert((mode==="merge"?"备份已合并到现有记录。":"本机记录已被备份替换。")+(patched?`\n词条修改 ${patched} 条也一并恢复了。`:""))}catch(err){alert("无法识别这个备份文件。")}e.target.value=""};Lshow("home")}
+// Settings and the position where you had got to are the learner's too, and a
+// reload is the honest way to put a whole new set of them into effect.
+const settings=d.prefs&&typeof d.prefs==="object"&&!Array.isArray(d.prefs)?d.prefs:null;
+if(settings){DWStore.prefs(settings);DWStore.flush()}
+alert((mode==="merge"?"备份已合并到现有记录。":"本机记录已被备份替换。")+(patched?`\n词条修改 ${patched} 条也一并恢复了。`:"")+(settings?"\n设置和「学到哪一章」也恢复了。":""));
+if(settings){location.reload();return}}catch(err){alert("无法识别这个备份文件。")}e.target.value=""};Lshow("home")}
 function LreadyFail(msg,retry){const b=L$("learnStartBtn");if(b){b.disabled=true;b.textContent="学习词库未就绪"}if(!LreadyFail.noticed){LreadyFail.noticed=true;DWStore.notice("bad",`<b>背词模式的数据没能加载。</b> ${Lesc(msg)}｜单词检测不受影响。`,[{label:"重新加载",run:row=>{row.remove();LreadyFail.noticed=false;retry()}}])}const body=L$("learnBody");if(body)body.innerHTML=`<div class="sessionDone"><div class="big">⚠️</div><h2>学习词库没能加载</h2><p class="sub">${Lesc(msg)}</p><div class="learnActions"><button class="primary" id="learnRetry">重新加载</button></div></div>`;const r=L$("learnRetry");if(r)r.onclick=()=>{if(body)body.innerHTML=`<div class="sessionDone"><div class="big">⏳</div><h2>正在重新加载…</h2></div>`;retry()}}
 async function Lready(){
   const b=L$("learnStartBtn");if(b)b.textContent="正在准备…";
@@ -445,4 +456,18 @@ function LhomeEntries(){const host=L$("homeEntries");if(!host)return;for(const i
  // of icon, and its label becomes an element of its own.
  const t=b.firstChild;if(t&&t.nodeType===3){const label=document.createElement("span");label.className="entryLabel";label.textContent=t.textContent.trim();b.replaceChild(label,t);const ic=document.createElement("span");ic.className="entryIcon";ic.innerHTML=Licon(LENTRY_ICONS[id]||"book");b.prepend(ic)}
  host.appendChild(b)}}
-function Lboot(){LbuildShell();LinitWrongBookUI();LinitMasteredUI();LinitDrillUI();LinitBrowseUI();LinitBackupUI();LinitEditUI();LinitQuizLink();LhomeEntries();Lready()}
+const LonIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent||"")||(navigator.platform==="MacIntel"&&(navigator.maxTouchPoints||0)>1);
+const LstandaloneApp=()=>navigator.standalone===true||!!(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches);
+// Safari deletes everything a site stored after seven days without a visit,
+// unless the site is on the home screen. Here that is the word list and a year
+// of progress, so it is said on the home screen, once a month, rather than left
+// in a help page nobody opens.
+const LINSTALL_QUIET=30*24*60*60*1000;
+function LinstallNote(){const host=L$("homeView");if(!host||!LonIOS()||LstandaloneApp())return;
+ const at=DWStore.prefs().installNoteAt||0;if(Date.now()-at<LINSTALL_QUIET)return;
+ const box=document.createElement("div");box.className="installNote";box.id="installNote";
+ box.innerHTML=`<b>把它加到主屏幕，记录才不会丢</b><p>iPhone 上的网页，<b>七天不打开，系统就会清掉它存的东西</b>——你的词库和全部学习进度都在里面。点浏览器底部的「分享」，选「添加到主屏幕」，之后从桌面图标打开就不受这条限制。</p><div class="row"><button class="primary" id="installNoteOk">知道了</button><button class="secondary" id="installNoteBackup">先备份一份</button></div>`;
+ host.prepend(box);
+ L$("installNoteOk").onclick=()=>{DWStore.prefs({installNoteAt:Date.now()});box.remove()};
+ L$("installNoteBackup").onclick=()=>{if(typeof LopenBackup==="function")LopenBackup()}}
+function Lboot(){LbuildShell();LinitWrongBookUI();LinitMasteredUI();LinitDrillUI();LinitBrowseUI();LinitBackupUI();LinitEditUI();LinitQuizLink();LhomeEntries();LinstallNote();Lready()}

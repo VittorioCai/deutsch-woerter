@@ -50,3 +50,7 @@ button:not(:disabled):active{transform:scale(.98)}
 .landing{padding:4px 2px}.landingHead{margin:4px 0 10px;font-size:20px}.landingList{display:grid;gap:6px}.landRow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#f9fafc}.landWord{font-weight:700;font-size:16px}.landTag{font-size:12px;color:var(--muted)}.landTag.mastered{color:var(--good)}.landTag.due{color:var(--bad)}.landTag.learning{color:var(--accent)}.landMore{margin-top:8px}
 #learnBody.answered .phaseTitle,#learnBody.answered .wordRow,#learnBody.answered .learnZh,#learnBody.answered .learnEn,#learnBody.answered .answerBox,#learnBody.answered .charBar,#learnBody.answered .spellHint,#learnBody.answered .choice:not(.correct):not(.wrong){opacity:.5}
 .nextLine{margin-top:6px;font-weight:600}.nextLine:empty{display:none}.fbDetails{margin-top:10px}.fbDetails summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--muted);padding:6px 0}.fbDetails[open] summary{margin-bottom:4px}
+.installNote{border:1px solid #f0dcae;background:#fff8e8;border-radius:14px;padding:14px 16px;margin:10px 0 12px;line-height:1.7}
+.installNote b{font-size:16px}
+.installNote p{margin:6px 0 12px;font-size:14px;color:var(--ink)}
+.installNote .row button{flex:1 1 auto;padding:10px 14px;font-size:14px}

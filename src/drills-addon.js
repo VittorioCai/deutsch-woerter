@@ -511,7 +511,10 @@ function LanswerConj(c, ask, show) {
   L$("drillAnswer").disabled = L$("drillCheck").disabled = L$("drillShow").disabled = true;
   // The whole row is shown whichever form was asked: the point of a strong verb
   // is that its three forms go together.
-  const row = [`er ${k.present}`, k.past ? `er ${k.past}` : "", k.perfect ? `er ${k.perfect}` : ""].filter(Boolean).join("　·　");
+  // The other forms, not the one just answered: a weak verb has two, and
+  // printing the answer again underneath it looked like a mistake.
+  const row = [`er ${k.present}`, k.past ? `er ${k.past}` : "", k.perfect ? `er ${k.perfect}` : ""]
+    .filter((f) => f && f !== `er ${want}`).join("　·　");
   const why = k.separable ? "可分动词：前缀甩到句末。" : k.regular ? "" : "强变化：词干元音变了，这类只能记。";
   LdrillNext(ok, `<div class="answerRow"><div class="deAnswer">er ${Lesc(want)}</div>${LspeakBtn(`er ${want}`)}</div><div class="meta">${Lesc(row)}</div>${why ? `<div class="meta">${why}</div>` : ""}${!ok && !show && v ? `<div class="wrongInput">你写的是：${Lesc(v)}</div>` : ""}`);
 }
