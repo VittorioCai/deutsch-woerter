@@ -61,7 +61,7 @@ async function LrenderBackup() {
     ? `<div class="backupWay"><h4>选一个文件夹，以后自动备份${auto ? "（已开）" : ""}</h4><p>${auto ? `现在写到 <b>${Lesc(st.folder.name)}</b>。` : "选 iCloud 云盘 / Google 云端硬盘 / OneDrive 的文件夹，就等于自动同步到云上——这里不需要服务器，也不需要账号。"}每次打开应用时写一次，并且会保留上一份，不会一次写坏就全没。</p><div class="row"><button class="${auto ? "secondary" : "primary"}" id="backupPick">${auto ? "换个文件夹" : "选文件夹"}</button>${auto ? `<button class="secondary" id="backupNow">立即备份</button><button class="secondary" id="backupOff">关掉自动备份</button>` : ""}</div></div>`
     : `<div class="backupWay off"><h4>自动备份到文件夹</h4><p>这个浏览器不支持（目前只有电脑版 Chrome / Edge）。手机上请用下面的「发送备份」。</p></div>`);
   if (st.ways.share) ways.push(`<div class="backupWay"><h4>发送备份…</h4><p>打开系统的分享菜单，可以存进「文件」「云盘」，或者发给自己。手机上这是最省事的一种。</p><div class="row"><button class="primary" id="backupShare">发送备份…</button></div></div>`);
-  ways.push(`<div class="backupWay"><h4>导出文件</h4><p>下载一个 <code>.json</code>，随便放哪。想恢复的时候用首页的「导入学习记录」——导入是<b>合并</b>，不会覆盖掉更新的记录。</p><div class="row"><button class="secondary" id="backupExport">导出文件</button></div></div>`);
+  ways.push(`<div class="backupWay"><h4>导出文件</h4><p>下载一个 <code>.json</code>，随便放哪。想恢复的时候用「数据与设置」里的「从备份恢复」——导入是<b>合并</b>，不会覆盖掉更新的记录。</p><div class="row"><button class="secondary" id="backupExport">导出文件</button></div></div>`);
 
   box.innerHTML = risk + ways.join("");
   const wire = (id, fn) => { const b = L$(id); if (b) b.onclick = fn };
@@ -110,7 +110,7 @@ async function LrenderBackupLine() {
   finally { LbackupLineBusy = false; }
 }
 function LinitBackupUI() {
-  const line = L$("homeBackupLine"), fallback = L$("exportBtn");
+  const line = L$("homeBackupLine"), fallback = L$("importBtn");
   if (!L$("backupBtn") && (line || fallback)) {
     const b = document.createElement("button");
     b.id = "backupBtn";

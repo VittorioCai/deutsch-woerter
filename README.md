@@ -147,9 +147,9 @@ also means nothing is backed up for you:
   gets the system share sheet; everything else downloads a JSON. The reminder
   fires on how much you have learnt since the last backup, not only on elapsed
   days, and an automatic backup always keeps the copy it replaces.
-- **导出学习记录** writes a JSON backup. Do it now and then; a browser that clears
+- **备份** writes a JSON backup, settings and all. Do it now and then; a browser that clears
   site data takes your history with it. The app nags after 30 days.
-- **导入学习记录** merges by default (newer record wins per word) rather than
+- **从备份恢复** merges by default (newer record wins per word) rather than
   replacing, so restoring a backup from another device cannot wipe this one.
 - **导出词库** writes your word list back out. Keep it somewhere your phone can
   reach; you need it again on every new device.

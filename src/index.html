@@ -61,8 +61,7 @@ die Tür,门,A1,1</pre>
   </div>
   <div class="tools">
     <button class="install" id="installBtn" style="display:none">安装到手机桌面</button>
-    <button class="secondary" id="exportBtn">导出学习记录</button>
-    <button class="secondary" id="importBtn">导入学习记录</button>
+    <button class="secondary" id="importBtn">从备份恢复</button>
     <button class="secondary" id="deckExportBtn">导出词库</button>
     <button class="secondary" id="deckSwapBtn">更换词库</button>
     <input id="fileImport" type="file" accept="application/json,.json">
@@ -184,7 +183,7 @@ $("deckExportBtn").onclick=()=>{if(!DECK)return;DWStore.downloadText(`${(DECK.na
  z.addEventListener("drop",e=>{const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)useDeckFile(f)})}
 $("startBtn").onclick=()=>start(false);$("weakBtn").onclick=()=>start(true);$("resetBtn").onclick=()=>{if(confirm("确定清空本机的「单词检测」记录吗？\n\n背词模式的学习进度不受影响。")){progress={};DWStore.queue(STORE_KEY,()=>progress);DWStore.flush();stats();bank()}};$("submitBtn").onclick=()=>{$("answer").blur();check()};$("showBtn").onclick=()=>{$("answer").blur();reveal(false)};$("nextBtn").onclick=()=>{index++;question();bring(document.querySelector(".quiz"),"start")};$("answer").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();if(answered)$("nextBtn").click();else{$("answer").blur();check()}}});$("level").onchange=chapters;$("chapter").onchange=bank;$("quizSettingsBtn").onclick=()=>{const d=$("quizSettings");d.open=!d.open;if(d.open)bring(d,"start")};
 let deferred=null;window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;$("installBtn").style.display="";$("appStatus").textContent="可以安装到手机桌面。"});$("installBtn").onclick=async()=>{if(!deferred)return;deferred.prompt();try{await deferred.userChoice}catch(e){}deferred=null;$("installBtn").style.display="none"};window.addEventListener("appinstalled",()=>$("appStatus").textContent="已安装到手机桌面。")
-function dl(name,obj){DWStore.download(name,obj)}$("exportBtn").onclick=()=>DWStore.exportBackup();$("importBtn").onclick=()=>$("fileImport").click();$("fileImport").onchange=async e=>{const f=e.target.files&&e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text()),p=d.quizProgress||d.progress||d;if(!p||typeof p!=="object"||Array.isArray(p))throw 0;progress=mergeProgress(progress,p,"last");DWStore.queue(STORE_KEY,()=>progress);DWStore.flush();stats();alert("学习记录已合并导入。")}catch(err){alert("无法识别这个备份文件。")}e.target.value=""}
+function dl(name,obj){DWStore.download(name,obj)}$("importBtn").onclick=()=>$("fileImport").click();$("fileImport").onchange=async e=>{const f=e.target.files&&e.target.files[0];if(!f)return;try{const d=JSON.parse(await f.text()),p=d.quizProgress||d.progress||d;if(!p||typeof p!=="object"||Array.isArray(p))throw 0;progress=mergeProgress(progress,p,"last");DWStore.queue(STORE_KEY,()=>progress);DWStore.flush();stats();alert("学习记录已合并导入。")}catch(err){alert("无法识别这个备份文件。")}e.target.value=""}
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").then(r=>{$("appStatus").textContent="离线模式已启用。";r.update().catch(()=>{})}).catch(()=>{}));
 loadCards();
 </script>
